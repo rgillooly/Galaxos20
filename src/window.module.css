@@ -1,0 +1,31 @@
+/* Window.module.css */
+.subWindow, .windowGalaxy, .windowParliament, .windowCooperativeHQ, .windowMeetingRoom {
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 2px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+    min-width: 150px;
+    min-height: 100px;
+    position: absolute;
+}
+
+.header {
+    background-color: #555555;
+    color: white;
+    padding: 8px;
+    cursor: move;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.closeButton {
+    background-color: red;
+    width: 20px;
+    height: 20px;
+    border: none;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+}
