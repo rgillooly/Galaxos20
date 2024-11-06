@@ -1,0 +1,74 @@
+/* GameContainer.css */
+/* GameContainer.css */
+.game-container {
+  position: absolute;
+  top: 50px; /* Adjust as needed */
+  left: 50px; /* Adjust as needed */
+  width: 80vw; /* Default width as a percentage of viewport width */
+  height: 70vh; /* Default height as a percentage of viewport height */
+  border: 1px solid #ccc; /* Border for the container */
+  background-color: #f9f9f9; /* Background color */
+  box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1); /* Shadow for depth */
+  z-index: 1000; /* Bring to front */
+  overflow: auto;
+}
+
+.game-header {
+  display: flex;
+  justify-content: space-between; /* Space out header content */
+  align-items: center;
+  background-color: #e0e0e0; /* Header background */
+  padding: 5px; /* Padding for header */
+}
+
+.game-header h3 {
+  margin: 0; /* Remove default margin */
+}
+
+.game-content {
+  padding: 10px; /* Padding for content */
+}
+
+.close-button {
+  background-color: red;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.close-button:hover {
+  background-color: darkred; /* Darker red on hover */
+}
+
+/* Media query for ultra-wide screens */
+@media (min-width: 1920px) {
+  .game-container {
+    width: 70vw; /* Increase width for ultra-wide screens */
+    height: 75vh; /* Increase height for ultra-wide screens */
+  }
+}
+
+/* Media query for larger screens (e.g., desktops) */
+@media (min-width: 1024px) and (max-width: 1919px) {
+  .game-container {
+    width: 70vw; /* Adjusted width for larger screens */
+    height: 65vh; /* Adjusted height for larger screens */
+  }
+}
+
+/* Media query for tablets */
+@media (max-width: 1023px) {
+  .game-container {
+    width: 90vw;
+    height: 80vh;
+  }
+}
+
+/* Media query for small screens (e.g., mobile devices) */
+@media (max-width: 480px) {
+  .game-container {
+    width: 95vw;
+    height: 85vh;
+  }
+}
