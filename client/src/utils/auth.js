@@ -1,43 +1,40 @@
-import jwt from "jwt-decode";
+import decode from 'jwt-decode';
 
 class AuthService {
-  // Decode and return the user's profile from the token
-  static getProfile() {
-    const token = localStorage.getItem("token"); // Consistent key usage
-    if (token) {
-      try {
-        return jwt(token); // Decode the token to get user data
-      } catch (error) {
-        console.error("Error decoding token:", error);
-        return null; // Return null if decoding fails
-      }
+    getProfile() {
+        return decode(this.getToken());
     }
-    return null; // Return null if no token exists
-  }
 
-  // Check if the user is logged in (i.e., if a valid token exists)
-  static loggedIn() {
-    return typeof window !== "undefined" && !!localStorage.getItem("token"); // Consistent key usage
-  }
-
-  // Get the current stored token
-  static getToken() {
-    return typeof window !== "undefined" ? localStorage.getItem("token") : null; // Consistent key usage
-  }
-
-  // Logout the user by removing the token from localStorage
-  static logout() {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("token"); // Consistent key usage
+    loggedIn() {
+        const token = this.getToken();
+        return token && !this.isTokenExpired(token)? true: false;
     }
-  }
 
-  // Login the user by storing the token in localStorage
-  static login(token) {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("token", token); // Consistent key usage
+    isTokenExpired(token) {
+        //Decode the token to get its expiration time that was set by server
+        const decoded = decode(token);
+        //If the expiration time is less than the current time (in seconds), the token is expired and we return `true`
+        if (decoded.exp < Date.now() / 1000) {
+            localStorage.removeItem('id_token');
+                return true;
+            }
+        // If token hasn't passed its expiration time, return `false`
+        return false;
+        }
+
+    getToken() {
+        return localStorage.getItem('id_token');
     }
-  }
+
+    login(idToken) {
+        localStorage.setItem('id_token', idToken);
+        window.location.assign('/');
+    }
+
+    logout() {
+        localStorage.removeItem('id_token');
+        window.location.assign('/');
+    }
 }
 
-export default AuthService;
+export default new AuthService();

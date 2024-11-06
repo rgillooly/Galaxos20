@@ -1,102 +1,81 @@
-const { gql } = require("graphql-tag");
+const typeDefs = `
+type User {
+  id: ID!
+  username: String!
+  email: String!
+  password: String!
+  createdGames: [Game]
+}
 
-const typeDefs = gql`
-  input GameInput {
-    name: String!
-    description: String!
-  }
+type Game {
+  id: ID!
+  name: String!
+  description: String!
+  user: User
+  assetMenus: [AssetMenu]
+}
 
-  type Position {
-    top: Int
-    left: Int
-  }
 
-  type AuthPayload {
-    token: String!
-    user: User!
-  }
+# Define Position as a separate output type for queries
+type Position {
+  top: Float
+  left: Float
+}
 
-  type Auth {
-    token: ID!
-    user: User
-  }
+# Define PositionInput as an input type for mutations
+input PositionInput {
+  top: Float
+  left: Float
+}
 
-  type User {
-    id: ID! # Ensure we always use 'id' in GraphQL
-    username: String!
-    email: String!
-    password: String!
-    games: [Game] # List of games created by the user
-  }
+# Define the AssetMenu type
+type AssetMenu {
+  id: ID!
+  title: String!
+  position: Position  # Changed to Position (output type)
+  assets: [Asset]
+}
 
-  type Game {
-    id: ID! # ID of the game, ensure this matches the MongoDB id field (aliased)
-    name: String!
-    description: String
-    user: User
-    assetMenus: [AssetMenu] # Link games to asset menus
-  }
+input GameInput {
+  name: String
+  description: String
+}
 
-  type AssetMenu {
-    id: ID!
-    gameId: ID!
-    title: String!
-    position: Position!
-    assets: [Asset]!
-  }
+input AssetMenuInput {
+  title: String!
+  position: PositionInput  # Still using PositionInput here for mutations
+}
 
-  type Asset {
-    id: ID!
-    type: String
-    url: String
-  }
+type Asset {
+  id: ID!
+  name: String!
+  url: String!
+}
 
-  input AssetMenuInput {
-    title: String!
-    position: PositionInput!
-  }
+type Auth {
+  token: ID!
+  user: User
+}
 
-  input PositionInput {
-    top: Int
-    left: Int
-  }
+type Query {
+  users: [User]
+  getGames: [Game]
+  game(_id: ID!): Game
+  getAssetMenus: [AssetMenu]
+  getUser(_id: ID!): User  # Corrected to return a single user by ID
+  user(username: String, email: String): User  # Allows querying by username or email
+  me: User
+}
 
-  input AssetInput {
-    name: String!
-    type: String!
-    url: String
-  }
-
-  input CreateGameInput {
-    id: ID!
-    name: String!
-    description: String
-    assetMenus: [AssetMenuInput] # Include asset menus in the input
-  }
-
-  type Query {
-    users: [User]
-    getUser(id: ID!): User # Fetch a user by id
-    getGames: [Game]! # Fetch all games
-    getAssetMenus: [AssetMenu] # Get all asset menus
-    getAssetMenu(id: ID!): AssetMenu # Get a specific asset menu by id
-  }
-
-  type Mutation {
-    addUser(username: String!, email: String!, password: String!): Auth
-    login(email: String!, password: String!): Auth
-    createGame(input: GameInput!, userId: ID!): Game
-    updateGame(id: ID!, name: String!): Game
-    deleteGame(id: ID!): Game
-    createAssetMenuAndLink(
-      gameId: ID!
-      title: String!
-      position: PositionInput
-      assets: [AssetInput!]!
-    ): AssetMenu
-    updateAssetMenu(id: ID!, name: String, position: PositionInput): AssetMenu
-    deleteAssetMenu(id: ID!): Boolean
-  }
+type Mutation {
+  addUser(username: String!, email: String!, password: String!): Auth  # Corrected mutation
+  login(email: String!, password: String!): Auth
+  createGame(_id: ID!, input: GameInput!): Game
+  updateGame(_id: ID!, input: GameInput!): Game
+  deleteGame(_id: ID!): Game
+  createAssetMenu(_id: ID!, input: AssetMenuInput!): AssetMenu  # Fixed the typo here
+  deleteAssetMenu(_id: ID!): AssetMenu  # Fixed the typo here
+}
 `;
 
 module.exports = typeDefs;

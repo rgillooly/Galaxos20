@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useQuery } from "@apollo/client";
+import { useQuery, useMutation } from "@apollo/client";
 import { GET_GAMES } from "../utils/queries";
 import GameContainer from "./GameContainer";
+import { CREATE_GAME } from "../utils/mutations"; // Import CREATE_GAME mutation
+import { v4 as uuidv4 } from 'uuid'; // Import uuid
 
 const GameList = () => {
   const [gameName, setGameName] = useState("");
@@ -12,6 +14,7 @@ const GameList = () => {
     error: gamesError,
     data,
   } = useQuery(GET_GAMES);
+  const [createGame] = useMutation(CREATE_GAME);
 
   // Track the drag state for each game
   const [draggingGame, setDraggingGame] = useState(null);
@@ -64,9 +67,37 @@ const GameList = () => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    // Handle game creation here
-  };
-
+    try {
+      const id = uuidv4(); // Generate a unique id as expected by the backend
+  
+      // Call the mutation and update the cache
+      await createGame({
+        variables: {
+          id, // Pass the generated id instead of _id
+          input: {
+            name: gameName,
+            description: gameDescription,
+          },
+        },
+        update(cache, { data: { createGame } }) {
+          // Update the GET_GAMES query cache with the new game
+          const { getGames } = cache.readQuery({ query: GET_GAMES });
+          cache.writeQuery({
+            query: GET_GAMES,
+            data: {
+              getGames: [...getGames, createGame], // Add the newly created game to the cache
+            },
+          });
+        },
+      });
+  
+      setGameName(""); // Clear input
+      setGameDescription(""); // Clear input
+    } catch (e) {
+      console.error("Error creating game:", e);
+    }
+  };    
+      
   const handleOpenGame = (game) => {
     setOpenGames((prev) => [...prev, game]);
     setPositions((prev) => ({
