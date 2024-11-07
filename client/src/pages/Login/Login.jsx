@@ -10,7 +10,7 @@ const Login = () => {
     password: "",
   });
   const { email, password } = inputValue;
-  
+
   const handleOnChange = (e) => {
     const { name, value } = e.target;
     setInputValue({
@@ -23,6 +23,7 @@ const Login = () => {
     toast.error(err, {
       position: "bottom-left",
     });
+
   const handleSuccess = (msg) =>
     toast.success(msg, {
       position: "bottom-left",
@@ -30,44 +31,32 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const loginData = { email, password };
+    console.log("Sending Login Data:", loginData);
+
     try {
-      // Send login credentials to server
       const { data } = await axios.post(
-        "http://localhost:3001/api/auth/login",
-        {
-          email,
-          password,
-        },
-        { withCredentials: true } // Include credentials (cookies) if necessary
+        "http://localhost:3001/api/auth/login", // Correct endpoint
+        loginData
       );
+      console.log("Response:", data);
 
-      console.log(data);
-
-      const { success, message, token } = data; // Assuming token is returned in the response
-
-      if (success) {
-        handleSuccess(message);
-        
-        // Save the token to localStorage (or sessionStorage if you want it to be cleared when the browser is closed)
-        localStorage.setItem('token', token); // Save token
-
-        // Navigate to the game list after successful login
+      if (data.success) {
+        localStorage.setItem("token", data.token); // Save JWT token
+        console.log("Token Saved:", data.token);
+        handleSuccess("Login successful! Redirecting...");
         setTimeout(() => {
           navigate("/GameList");
-        }, 1000);
+        }, 1500); // Redirect after a short delay to show success message
       } else {
-        handleError(message);
+        console.error("Login Failed:", data.message);
+        handleError(data.message || "Login failed. Please try again.");
       }
     } catch (error) {
-      console.log(error);
-      handleError("An error occurred. Please try again.");
+      console.error("Login Error:", error);
+      handleError("Login failed. Please try again.");
     }
-
-    // Clear input fields
-    setInputValue({
-      email: "",
-      password: "",
-    });
   };
 
   return (
@@ -82,6 +71,7 @@ const Login = () => {
             value={email}
             placeholder="Enter your email"
             onChange={handleOnChange}
+            required
           />
         </div>
         <div>
@@ -92,11 +82,12 @@ const Login = () => {
             value={password}
             placeholder="Enter your password"
             onChange={handleOnChange}
+            required
           />
         </div>
         <button type="submit">Submit</button>
         <span>
-          Already have an account? <Link to={"/signup"}>Signup</Link>
+          Don't have an account? <Link to={"/signup"}>Signup</Link>
         </span>
       </form>
       <ToastContainer />

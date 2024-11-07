@@ -1,19 +1,18 @@
-const User = require("../models/UserModel");
-require("dotenv").config();
 const jwt = require("jsonwebtoken");
 
-module.exports.userVerification = (req, res) => {
-  const token = req.cookies.token
+const authenticateJWT = (req, res, next) => {
+  const token = req.header("Authorization")?.split(" ")[1]; // Bearer token
   if (!token) {
-    return res.json({ status: false })
+    return res.status(401).json({ message: "Access Denied" });
   }
-  jwt.verify(token, process.env.TOKEN_KEY, async (err, data) => {
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) {
-     return res.json({ status: false })
-    } else {
-      const user = await User.findById(data.id)
-      if (user) return res.json({ status: true, user: user.username })
-      else return res.json({ status: false })
+      return res.status(403).json({ message: "Invalid Token" });
     }
-  })
-}
+    req.user = user; // The decoded user data will be set in req.user
+    next();
+  });
+};
+
+module.exports = authenticateJWT;

@@ -1,194 +1,150 @@
-import React, { useState, useRef, useEffect } from "react";
-import axios from "axios"; // Import Axios
-import GameContainer from "../GameContainer/GameContainer";
+import React, { useState, useEffect } from "react";
+import { useUser } from "../context/UserContext";
+import axios from "axios";
+import { Link } from "react-router-dom";
+import GameComponent from "../GameContainer/GameContainer"; // Import GameComponent
 
 const GameList = () => {
+  const { user } = useUser();
   const [gameName, setGameName] = useState("");
   const [gameDescription, setGameDescription] = useState("");
-  const [openGames, setOpenGames] = useState([]);
-  const [games, setGames] = useState([]);
-  const [loadingGames, setLoadingGames] = useState(true);
-  const [gamesError, setGamesError] = useState(null);
+  const [games, setGames] = useState([]); // State for user's games
+  const [error, setError] = useState("");
+  const [gameLoading, setLoading] = useState(false);
+  const [selectedGame, setSelectedGame] = useState(null); // State for selected game
 
-  // Track the drag state for each game
-  const [draggingGame, setDraggingGame] = useState(null);
-  const [positions, setPositions] = useState({});
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const containerRefs = useRef({});
-
+  // Fetch the user's games on component mount
   useEffect(() => {
-    // Fetch games using Axios
-    const fetchGames = async () => {
-      setLoadingGames(true);
+    const fetchUserGames = async () => {
       try {
-        const response = await axios.get("http://localhost:3001/api/games");
-        setGames(response.data); // Assuming the API returns an array of games
-        setLoadingGames(false);
+        const token = localStorage.getItem("token");
+        if (!token) {
+          setError("Token not found");
+          return;
+        }
+
+        const response = await axios.get(
+          "http://localhost:3001/api/games/user",
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+
+        if (response.data.success) {
+          setGames(response.data.games);
+        } else {
+          setError(response.data.message || "Failed to load games.");
+        }
       } catch (error) {
-        setGamesError(error);
-        setLoadingGames(false);
+        console.error("Error fetching games:", error);
+        setError(
+          error.response?.data?.message ||
+            "An error occurred while fetching games."
+        );
       }
     };
-    fetchGames();
+
+    fetchUserGames();
   }, []);
 
-  const handleMouseDown = (e, gameId) => {
-    setDraggingGame(gameId);
-    const initialPosition = positions[gameId] || { top: 100, left: 100 };
-    setOffset({
-      x: e.clientX - initialPosition.left,
-      y: e.clientY - initialPosition.top,
-    });
-  };
-
-  const handleMouseMove = (e) => {
-    if (!draggingGame) return;
-
-    const newTop = e.clientY - offset.y;
-    const newLeft = e.clientX - offset.x;
-
-    setPositions((prevPositions) => ({
-      ...prevPositions,
-      [draggingGame]: { top: newTop, left: newLeft },
-    }));
-  };
-
-  const handleMouseUp = () => {
-    setDraggingGame(null);
-  };
-
-  useEffect(() => {
-    if (draggingGame) {
-      window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
-    } else {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    }
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [draggingGame]);
-
+  // Handle form submission to create a new game
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    // Retrieve token from localStorage
-    const token = localStorage.getItem('token'); // Retrieve token from localStorage
-
+    const token = localStorage.getItem("token");
     if (!token) {
-      console.error('Token not found');
-      return; // Optionally show an error message to the user
+      console.error("Token not found");
+      return;
     }
+
+    if (!gameName || !gameDescription) {
+      setError("Both game name and description are required.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
 
     try {
-      const newGame = {
-        name: gameName,
-        description: gameDescription,
-        userId: user._Id, // Replace with actual user ID (you might want to get it from state or context)
-      };
+      const newGame = { gameName, gameDescription, user: user._id };
 
-      // Send the token in the Authorization header
       const response = await axios.post(
-        "http://localhost:3001/api/games", 
-        newGame, 
-        {
-          headers: {
-            Authorization: `Bearer ${token}`, // Add token here
-          }
-        }
+        "http://localhost:3001/api/games",
+        newGame,
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // Handle response
-      setGames((prevGames) => [...prevGames, response.data.game]); // Assuming the response contains the game object
-      setGameName("");
-      setGameDescription("");
+      if (response.data.success) {
+        alert("Game created successfully!");
+        setGameName("");
+        setGameDescription("");
+        setGames((prevGames) => [...prevGames, response.data.game]);
+      } else {
+        setError(response.data.message || "Failed to create game.");
+      }
     } catch (error) {
       console.error("Error creating game:", error);
+      setError(
+        error.response?.data?.message ||
+          "An error occurred while creating the game."
+      );
+    } finally {
+      setLoading(false);
     }
   };
-
-  const handleOpenGame = (game) => {
-    setOpenGames((prev) => [...prev, game]);
-    setPositions((prev) => ({
-      ...prev,
-      [game._id]: { top: 100, left: 100 },
-    }));
-  };
-
-  const handleCloseGame = (game) => {
-    setOpenGames((prev) => prev.filter((g) => g._id !== game._id));
-  };
-
-  if (loadingGames) return <p>Loading games...</p>;
-  if (gamesError) return <p>Error fetching games: {gamesError.message}</p>;
 
   return (
     <div>
       <h2>Create a New Game</h2>
       <form onSubmit={handleSubmit}>
         <div>
-          <label>
-            Name:
-            <input
-              type="text"
-              value={gameName}
-              onChange={(e) => setGameName(e.target.value)}
-              required
-            />
-          </label>
+          <label>Game Name:</label>
+          <input
+            type="text"
+            value={gameName}
+            onChange={(e) => setGameName(e.target.value)}
+            required
+            disabled={gameLoading}
+          />
         </div>
         <div>
-          <label>
-            Description:
-            <input
-              type="text"
-              value={gameDescription}
-              onChange={(e) => setGameDescription(e.target.value)}
-              required
-            />
-          </label>
+          <label>Description:</label>
+          <input
+            type="text"
+            value={gameDescription}
+            onChange={(e) => setGameDescription(e.target.value)}
+            required
+            disabled={gameLoading}
+          />
         </div>
-        <button type="submit">Create Game</button>
+        <button type="submit" disabled={gameLoading}>
+          {gameLoading ? "Creating..." : "Create Game"}
+        </button>
       </form>
+      {error && <p style={{ color: "red" }}>{error}</p>}
 
-      <h2>Game List</h2>
+      <h3>Your Games</h3>
       <ul>
         {games.length > 0 ? (
           games.map((game) => (
             <li key={game._id}>
-              <button onClick={() => handleOpenGame(game)}>{game.name}</button>
+              <strong>{game.gameName}</strong>: {game.gameDescription}
+              <button onClick={() => setSelectedGame(game)}>Open</button>
             </li>
           ))
         ) : (
-          <p>No games available.</p>
+          <p>No games created yet.</p>
         )}
       </ul>
 
-      {openGames.map((game) => (
-        <div
-          key={game._id}
-          ref={(el) => (containerRefs.current[game._id] = el)}
-          style={{
-            position: "absolute",
-            top: `${positions[game._id]?.top}px`,
-            left: `${positions[game._id]?.left}px`,
-            cursor: "move",
-            border: "1px solid #ccc",
-            padding: "10px",
-            borderRadius: "8px",
-          }}
-          onMouseDown={(e) => handleMouseDown(e, game._id)}
-        >
-          <GameContainer
-            initialGameName={game.name}
-            onClose={() => handleCloseGame(game)}
-            game={game}
-          />
-        </div>
-      ))}
+      {selectedGame && (
+        <GameComponent
+          game={selectedGame}
+          onClose={() => setSelectedGame(null)}
+        />
+      )}
+
+      <Link to="/logout">Logout</Link>
     </div>
   );
 };
