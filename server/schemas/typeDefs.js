@@ -58,6 +58,7 @@ type Auth {
 }
 
 type Query {
+getUserFromToken: User
   users: [User]
   getGames: [Game]
   game(_id: ID!): Game

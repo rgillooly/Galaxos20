@@ -18,7 +18,7 @@ export const LOGIN_USER = gql`
     login (email: $email, password: $password) {
       token
       user {
-        _id
+        id
         username
       }
     }
@@ -26,11 +26,12 @@ export const LOGIN_USER = gql`
 `;
 
 export const CREATE_GAME = gql`
-mutation createGame($id: ID!, $input: GameInput!) {
-  createGame(_id: $id, input: $input) {
+mutation CreateGame($input: GameInput!) {
+  createGame(input: $input) {
     id
     name
     description
+    userId
   }
 }
 `;

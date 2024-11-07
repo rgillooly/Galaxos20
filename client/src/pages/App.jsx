@@ -1,41 +1,19 @@
-import {
-  ApolloClient,
-  InMemoryCache,
-  ApolloProvider,
-  createHttpLink,
-} from "@apollo/client";
-import { setContext } from "@apollo/client/link/context";
-import { Outlet } from "react-router-dom";
-
-const httpLink = createHttpLink({
-  uri: "/graphql",
-});
-
-const authLink = setContext((_, { headers }) => {
-  // get the authentication token from local storage if it exists
-  const token = localStorage.getItem("token");
-  // return the headers to the context so httpLink can read them
-  return {
-    headers: {
-      ...headers,
-      authorization: token ? `Bearer ${token}` : "",
-    },
-  };
-});
-
-const client = new ApolloClient({
-  // Set up our client to execute the `authLink` middleware prior to making the request to our GraphQL API
-  link: authLink.concat(httpLink),
-  cache: new InMemoryCache(),
-});
+import { Route, Routes } from "react-router-dom";
+import Login  from "./Login/Login";
+import Signup  from "./Signup/Signup"
+import Landing from "./Home/Home";
+import GameList from "./GameList/GameList"
 
 function App() {
   return (
-    <>
-      <ApolloProvider client={client}>
-        <Outlet />
-      </ApolloProvider>
-    </>
+    <div className="App">
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/Signup" element={<Signup />} />
+        <Route path="/GameList" element={<GameList />} />
+      </Routes>
+    </div>
   );
 }
 

@@ -1,28 +1,36 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useQuery, useMutation } from "@apollo/client";
-import { GET_GAMES } from "../utils/queries";
-import GameContainer from "./GameContainer";
-import { CREATE_GAME } from "../utils/mutations"; // Import CREATE_GAME mutation
-import { v4 as uuidv4 } from 'uuid'; // Import uuid
+import axios from "axios"; // Import Axios
+import GameContainer from "../GameContainer/GameContainer";
 
 const GameList = () => {
   const [gameName, setGameName] = useState("");
   const [gameDescription, setGameDescription] = useState("");
   const [openGames, setOpenGames] = useState([]);
-  const {
-    loading: loadingGames,
-    error: gamesError,
-    data,
-  } = useQuery(GET_GAMES);
-  const [createGame] = useMutation(CREATE_GAME);
+  const [games, setGames] = useState([]);
+  const [loadingGames, setLoadingGames] = useState(true);
+  const [gamesError, setGamesError] = useState(null);
 
   // Track the drag state for each game
   const [draggingGame, setDraggingGame] = useState(null);
-  const [positions, setPositions] = useState({}); // Track each game's position
+  const [positions, setPositions] = useState({});
   const [offset, setOffset] = useState({ x: 0, y: 0 });
-
-  // Ref to track GameContainer positions
   const containerRefs = useRef({});
+
+  useEffect(() => {
+    // Fetch games using Axios
+    const fetchGames = async () => {
+      setLoadingGames(true);
+      try {
+        const response = await axios.get("http://localhost:3001/api/games");
+        setGames(response.data); // Assuming the API returns an array of games
+        setLoadingGames(false);
+      } catch (error) {
+        setGamesError(error);
+        setLoadingGames(false);
+      }
+    };
+    fetchGames();
+  }, []);
 
   const handleMouseDown = (e, gameId) => {
     setDraggingGame(gameId);
@@ -49,7 +57,6 @@ const GameList = () => {
     setDraggingGame(null);
   };
 
-  // Attach global listeners for dragging
   useEffect(() => {
     if (draggingGame) {
       window.addEventListener("mousemove", handleMouseMove);
@@ -67,53 +74,56 @@ const GameList = () => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    try {
-      const id = uuidv4(); // Generate a unique id as expected by the backend
-  
-      // Call the mutation and update the cache
-      await createGame({
-        variables: {
-          id, // Pass the generated id instead of _id
-          input: {
-            name: gameName,
-            description: gameDescription,
-          },
-        },
-        update(cache, { data: { createGame } }) {
-          // Update the GET_GAMES query cache with the new game
-          const { getGames } = cache.readQuery({ query: GET_GAMES });
-          cache.writeQuery({
-            query: GET_GAMES,
-            data: {
-              getGames: [...getGames, createGame], // Add the newly created game to the cache
-            },
-          });
-        },
-      });
-  
-      setGameName(""); // Clear input
-      setGameDescription(""); // Clear input
-    } catch (e) {
-      console.error("Error creating game:", e);
+
+    // Retrieve token from localStorage
+    const token = localStorage.getItem('token'); // Retrieve token from localStorage
+
+    if (!token) {
+      console.error('Token not found');
+      return; // Optionally show an error message to the user
     }
-  };    
-      
+
+    try {
+      const newGame = {
+        name: gameName,
+        description: gameDescription,
+        userId: user._Id, // Replace with actual user ID (you might want to get it from state or context)
+      };
+
+      // Send the token in the Authorization header
+      const response = await axios.post(
+        "http://localhost:3001/api/games", 
+        newGame, 
+        {
+          headers: {
+            Authorization: `Bearer ${token}`, // Add token here
+          }
+        }
+      );
+
+      // Handle response
+      setGames((prevGames) => [...prevGames, response.data.game]); // Assuming the response contains the game object
+      setGameName("");
+      setGameDescription("");
+    } catch (error) {
+      console.error("Error creating game:", error);
+    }
+  };
+
   const handleOpenGame = (game) => {
     setOpenGames((prev) => [...prev, game]);
     setPositions((prev) => ({
       ...prev,
-      [game.id]: { top: 100, left: 100 }, // Default position for new game container
+      [game._id]: { top: 100, left: 100 },
     }));
   };
 
   const handleCloseGame = (game) => {
-    setOpenGames((prev) => prev.filter((g) => g.id !== game.id));
+    setOpenGames((prev) => prev.filter((g) => g._id !== game._id));
   };
 
   if (loadingGames) return <p>Loading games...</p>;
   if (gamesError) return <p>Error fetching games: {gamesError.message}</p>;
-
-  const games = data.getGames || [];
 
   return (
     <div>
@@ -148,7 +158,7 @@ const GameList = () => {
       <ul>
         {games.length > 0 ? (
           games.map((game) => (
-            <li key={game.id}>
+            <li key={game._id}>
               <button onClick={() => handleOpenGame(game)}>{game.name}</button>
             </li>
           ))
@@ -159,23 +169,23 @@ const GameList = () => {
 
       {openGames.map((game) => (
         <div
-          key={game.id}
-          ref={(el) => (containerRefs.current[game.id] = el)}
+          key={game._id}
+          ref={(el) => (containerRefs.current[game._id] = el)}
           style={{
             position: "absolute",
-            top: `${positions[game.id]?.top}px`,
-            left: `${positions[game.id]?.left}px`,
+            top: `${positions[game._id]?.top}px`,
+            left: `${positions[game._id]?.left}px`,
             cursor: "move",
             border: "1px solid #ccc",
             padding: "10px",
             borderRadius: "8px",
           }}
-          onMouseDown={(e) => handleMouseDown(e, game.id)}
+          onMouseDown={(e) => handleMouseDown(e, game._id)}
         >
           <GameContainer
             initialGameName={game.name}
             onClose={() => handleCloseGame(game)}
-            game={game} // Pass the game object with assetMenus
+            game={game}
           />
         </div>
       ))}

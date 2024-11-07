@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import PropTypes from "prop-types";
-import { useMutation } from "@apollo/client";
-import { CREATE_ASSET_MENU } from "../utils/mutations";
-import AssetMenu from "./AssetMenu";
+import { CREATE_ASSET_MENU } from "../../utils/mutations";
+import AssetMenu from "../AssetMenu/AssetMenu";
 import "./GameContainer.css";
 
 function GameContainer({ initialGameName, onClose, game }) {

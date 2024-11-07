@@ -2,26 +2,17 @@ import { gql } from "@apollo/client";
 
 // Query to get games for the authenticated user
 export const GET_GAMES = gql`
-  query getGames {
-    getGames {
-      id # Change 'id' to 'id'
-      name
-      description
-      user {
-        # Use 'user' instead of 'userId'
-        id # Optionally get the user's ID
-        username # Assuming you have a username field
-      }
-      assetMenus {
-        id
-        title
-        position {
-          top
-          left
-        }
-      }
+query {
+  getGames {
+    id
+    name
+    user {
+      id
+      username
+      email
     }
   }
+}
 `;
 
 export const CREATE_GAME = gql`

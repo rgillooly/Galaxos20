@@ -1,61 +1,62 @@
 const express = require("express");
-const { ApolloServer } = require("@apollo/server");
-const { expressMiddleware } = require("@apollo/server/express4");
-const path = require("path");
-const { authMiddleware } = require("./utils/auth");
-const { typeDefs, resolvers } = require("./schemas");
-const db = require("./config/connection");
-const { User, Game, AssetMenu, Asset } = require('./models'); // Import models
+const mongoose = require("mongoose");
+const cors = require("cors");
+const cookieParser = require("cookie-parser");
+require("dotenv").config();
 
-const PORT = process.env.PORT || 3001;
+const gameRoutes = require("./routes/GameRoutes");
+const authRoutes = require("./routes/Auth"); // Assuming Auth.js handles auth routes
+const authenticate = require("./middlewares/Authenticate"); // Authentication middleware
+
+const Game = require("./models/Game");
+const User = require("./models/UserModel"); // Ensure User model is correctly imported
+
+const { MONGO_URL, PORT } = process.env;
+
+mongoose
+  .connect(MONGO_URL, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log("MongoDB is connected successfully"))
+  .catch((err) => console.error(err));
+
 const app = express();
 
-// Define an async function to start the Apollo Server
-async function startApolloServer() {
-  // Create a new instance of Apollo Server with the GraphQL schema
-  const server = new ApolloServer({
-    typeDefs,
-    resolvers,
-    context: ({ req }) => {
-      return {
-        user: req.user,  // Assuming you're attaching the logged-in user here
-        models: { Game, AssetMenu, Asset, User }  // Make sure models are passed correctly
-      };
-    }
-  });
+// Middleware setup
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' ? 'https://yourfrontenddomain.com' : 'http://localhost:3000',
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true, // Allow cookies to be sent with requests
+}));
 
-  // Apply JSON and URL-encoded middleware before the Apollo middleware
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
+app.use(express.json());
 
-  // Start the Apollo Server
-  await server.start();
+// Routes
+app.use("/api/auth", authRoutes); // Authentication routes
+app.use("/api/games", gameRoutes); // Game routes
 
-  // Set up the middleware for Apollo Server with Express
-  app.use('/graphql', expressMiddleware(server, {
-    context: async ({ req }) => ({
-      models: { User, Game, AssetMenu, Asset },
-      user: req.user || null,
-    }),
-  }));
-
-  // Serve static files in production
-  if (process.env.NODE_ENV === "production") {
-    app.use(express.static(path.join(__dirname, "../client/dist")));
-
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(__dirname, "../client/dist/index.html"));
-    });
+app.get("/api/games", async (req, res) => {
+  try {
+    const games = await Game.find();
+    res.json(games);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching games", error: err.message });
   }
+});
 
-  // Start the DB connection and then start the Express server
-  db.once("open", () => {
-    app.listen(PORT, () => {
-      console.log(`API server running on port ${PORT}!`);
-      console.log(`Use GraphQL at http://localhost:${PORT}/graphql`);
-    });
-  });
-}
+// Example user route
+app.get("/api/users", async (req, res) => {
+  try {
+    const users = await User.find();
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching users", error: err.message });
+  }
+});
 
-// Call the async function to start the server
-startApolloServer();
+// Start server
+app.listen(PORT, () => {
+  console.log(`Server is listening on port ${PORT}`);
+});

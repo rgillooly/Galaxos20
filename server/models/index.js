@@ -1,5 +1,5 @@
 // models/index.js
-const User = require("./User");
+const User = require("./UserModel");
 const Game = require("./Game");
 const AssetMenu = require("./Assetmenu");
 const Asset = require("./Asset");

@@ -1,29 +1,7 @@
-const { AuthenticationError, ApolloError } = require("@apollo/server/express4");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const mongoose = require("mongoose");
-const { User, Game, AssetMenu, Asset } = require("../models");
 
-const JWT_SECRET = process.env.ACCESS_TOKEN_SECRET || "fallback_secret";
-
-const signToken = (user) => {
-  const payload = {
-    data: {
-      id: user._id,
-      email: user.email,
-      username: user.username,
-    },
-  };
-
-  try {
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "2h" });
-    console.log("Token generated:", token);  // Log the token to verify it's generated
-    return token;
-  } catch (error) {
-    console.error("Error generating token:", error);
-    throw new ApolloError("Error generating token.");
-  }
-};
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const User = require('../models/UserModel');  // Correct path based on your project structure
 
 const resolvers = {
   User: {
@@ -36,30 +14,67 @@ const resolvers = {
       }));
     },
   },
+  
   Game: {
-    id: (parent) => parent._id.toString(),  // Ensure _id is cast to string
+    id: (parent) => parent._id.toString(),
+    
     assetMenus: async (game) => {
       const assetMenus = await AssetMenu.find({ gameId: game._id });
       return assetMenus.map((assetMenu) => ({
         ...assetMenu.toObject(),
-        id: assetMenu._id.toString(),  // Ensure _id is cast to string
+        id: assetMenu._id.toString(),
       }));
     },
+  
+    user: async (game) => {
+      // Check if game has a valid user reference
+      if (!game.user) {
+        return null; // No user associated, return null
+      }
+  
+      try {
+        const user = await User.findById(game.user); // Assuming "game.user" is a reference to the User model
+        return user || null; // If user is not found, return null
+      } catch (error) {
+        console.error("Error fetching user:", error); // Log the error for debugging
+        return null; // Return null in case of error
+      }
+    },
   },  
+
   AssetMenu: {
     id: (parent) => parent._id.toString(),
   },
-  Query: {
-    getGames: async (_, __, context) => {
-      console.log("Context:", context); // Debugging line
-      const { Game } = context.models;
-      if (!Game) {
-        throw new ApolloError("Game model is not defined in context.");
-      }
-      const games = await Game.find();
-      return games;
-    },
 
+  Query: {
+    getGames: async (parent, args, context) => {
+      const { user } = context;  // Access user from context
+      
+      if (!user) {
+        throw new AuthenticationError('You must be logged in to access games');  // Return error if no user
+      }
+    
+      // Fetch the games associated with the logged-in user
+      const games = await Game.find({ user: user._id });
+      return games;
+    },  
+
+    getUserFromToken: async (parent, args, context) => {
+      const token = context.headers.authorization || '';  
+      if (!token) {
+        throw new AuthenticationError('You must be logged in to access user info');
+      }
+
+      try {
+        const decoded = jwt.verify(token.split(' ')[1], process.env.JWT_SECRET);
+        const userId = decoded.userId;
+        const user = await User.findById(userId); // Adjust based on your model
+        return user;
+      } catch (err) {
+        throw new AuthenticationError('Invalid or expired token');
+      }
+    },
+    
     getAssetMenus: async (_, { gameId }) => {
       const assetMenus = await AssetMenu.find({ gameId }).populate("gameId");
       return assetMenus.map((assetMenu) => ({
@@ -77,7 +92,7 @@ const resolvers = {
     },
 
     getUser: async (_, { _id }, { User }) => {
-      return await User.findById(_id);  // Use _id instead of id
+      return await User.findById(_id);
     },
   },
 
@@ -85,49 +100,58 @@ const resolvers = {
     addUser: async (parent, { username, email, password }) => {
       try {
         const user = await User.create({ username, email, password });
-        const token = signToken(user);  // Generate token after successful signup
-        return { token, user };  // Return both the token and user
+        const token = signToken(user);
+        return { token, user };
       } catch (error) {
         console.error("Error adding user:", error);
-        throw new ApolloError("Failed to add user");
       }
     },
 
-    login: async (parent, { email, password }) => {
-      try {
-        const user = await User.findOne({ email });
-        if (!user) {
-          throw new AuthenticationError("User not found");
-        }
-
-        const correctPw = await user.isCorrectPassword(password);
-        if (!correctPw) {
-          throw new AuthenticationError("Incorrect password");
-        }
-
-        const token = signToken(user);  // Generate token after successful login
-        return { token, user };  // Return both the token and user
-      } catch (error) {
-        console.error("Error logging in:", error);
-        throw new ApolloError("Login failed");
+    login: async (_, { email, password }) => {
+      console.log('Attempting login with email:', email);
+    
+      const user = await User.findOne({ email });
+    
+      if (!user) {
+        console.log('User not found');
+        throw new AuthenticationError("User not found");
       }
-    },
+    
+      const validPassword = await bcrypt.compare(password, user.password);
+    
+      if (!validPassword) {
+        console.log('Invalid credentials');
+        throw new AuthenticationError("Invalid credentials");
+      }
+    
+      console.log('User authenticated successfully');
+    
+      const token = jwt.sign(
+        { userId: user._id },
+        process.env.JWT_SECRET,
+        { expiresIn: '1d' }
+      );
+    
+      return {
+        token,
+        user,
+      };
+    },    
 
     createGame: async (_, { _id, input }) => {
-      // Check if the _id is valid ObjectId string, else let MongoDB handle it
       const isValidObjectId = mongoose.Types.ObjectId.isValid(_id);
       const game = new Game({
-        _id: isValidObjectId ? mongoose.Types.ObjectId(_id) : undefined,  // Only use _id if it's valid
-        ...input,  // Include all fields from the input (e.g., title, description)
+        _id: isValidObjectId ? mongoose.Types.ObjectId(_id) : undefined,
+        ...input,
       });
-      
+
       const savedGame = await game.save();
-      
+
       return {
         ...savedGame.toObject(),
-        id: savedGame._id.toString(),  // Return the saved _id as a string if needed
+        id: savedGame._id.toString(),
       };
-    },           
+    },
 
     updateGame: async (_, { _id, input }, context) => {
       if (!context.user) {
@@ -136,7 +160,6 @@ const resolvers = {
 
       const game = await Game.findOne({ _id, user: context.user.id });
       if (!game) {
-        throw new ApolloError("Game not found or you do not have permission to update it.", "FORBIDDEN");
       }
 
       const updatedGame = await Game.findByIdAndUpdate(_id, input, { new: true });
@@ -156,9 +179,9 @@ const resolvers = {
       }
       return {
         ...game.toObject(),
-        id: game._id.toString(),  // Cast _id to string
+        id: game._id.toString(),
       };
-    },    
+    },
 
     createAssetMenu: async (_, { gameId, input }, context) => {
       const { Game, AssetMenu } = context.models;
@@ -196,7 +219,7 @@ const resolvers = {
       if (!context.user) {
         throw new AuthenticationError("Unauthorized");
       }
-      const assetMenu = await AssetMenu.findByIdAndDelete(_id);  // Correct use of _id
+      const assetMenu = await AssetMenu.findByIdAndDelete(_id);
       if (!assetMenu) {
         throw new ApolloError("AssetMenu not found", "NOT_FOUND");
       }
