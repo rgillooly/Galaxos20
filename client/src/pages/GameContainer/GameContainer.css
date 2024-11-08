@@ -1,4 +1,7 @@
-/* GameContainer.css */
+* {
+  box-sizing: border-box; /* Ensures padding and borders are included in element width/height */
+}
+
 /* GameContainer.css */
 .game-container {
   position: absolute;
@@ -6,11 +9,25 @@
   left: 50px; /* Adjust as needed */
   width: 80vw; /* Default width as a percentage of viewport width */
   height: 70vh; /* Default height as a percentage of viewport height */
-  border: 1px solid #ccc; /* Border for the container */
-  background-color: #f9f9f9; /* Background color */
+  background-color: #f9f9f9 !important; /* Force background color to be applied */
+  border: 1px solid #ccc; /* Border to see boundaries */
   box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1); /* Shadow for depth */
   z-index: 1000; /* Bring to front */
   overflow: auto;
+  opacity: 1 !important; /* Ensure full opacity */
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%; /* Ensure full height for body */
+  background-color: #fff; /* Ensure background color is set */
+}
+
+body {
+  background-color: #fff; /* Ensure body background is solid */
+  opacity: 1; /* Ensure no opacity is applied globally */
 }
 
 .game-header {

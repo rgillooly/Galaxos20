@@ -1,73 +1,47 @@
 import React, { useState } from "react";
 import PropTypes from "prop-types";
-import axios from "axios"; // Add axios for making API requests
+import axios from "axios"; // Ensure you have axios installed
 import AssetMenu from "../AssetMenu/AssetMenu";
 import "./GameContainer.css";
 
 function GameContainer({ initialGameName, onClose, game }) {
   const [windowTitle, setWindowTitle] = useState(initialGameName);
+  const [menuPosition, setMenuPosition] = useState({ top: 100, left: 100 });
   const [assetMenus, setAssetMenus] = useState(game.assetMenus || []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Ensure game object is valid
-  if (!game || !game.id) {
-    return (
-      <div>
-        <h2>Error: Game data is missing or invalid.</h2>
-        <button onClick={onClose}>Close</button>
-      </div>
-    );
-  }
-
   // Handle creating a new asset menu
   const handleCreateAssetMenu = async () => {
-    setLoading(true);
-    setError(null);
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      console.error("No token found");
+      return;
+    }
 
     try {
-      // Define the payload for the new asset menu
-      const newAssetMenu = {
-        title: "Asset Menu Title",
-        position: { top: 0, left: 0 },
-        assets: [
-          {
-            name: "Asset 1",
-            type: "image",
-            url: "http://example.com/image1.png",
-          },
-          {
-            name: "Asset 2",
-            type: "video",
-            url: "http://example.com/video1.mp4",
-          },
-        ],
-      };
-
-      // Replace with your actual API endpoint for creating an asset menu
       const response = await axios.post(
-        `http://localhost:3001/api/games/${game.id}/assetMenus`,
-        newAssetMenu,
+        `http://localhost:3001/api/${game._id}/assetMenus`,
         {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          gameId: game._id,
+          title: "New Asset Menu",
+          position: { top: 0, left: 0 },
+          assets: [], // Ensure valid assets
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`, // Attach token to header
+          },
         }
       );
 
-      if (response.data && response.data.success) {
-        // Append the newly created asset menu to the state
-        setAssetMenus((prev) => [...prev, response.data.assetMenu]);
-        console.log(
-          "Asset menu created successfully:",
-          response.data.assetMenu
-        );
-      } else {
-        setError("Failed to create asset menu.");
-      }
+      console.log("Asset Menu Created:", response.data);
     } catch (error) {
-      console.error("Error creating asset menu: ", error);
-      setError("An error occurred while creating the asset menu.");
-    } finally {
-      setLoading(false);
+      console.error(
+        "Error creating asset menu:",
+        error.response?.data || error
+      );
     }
   };
 
@@ -86,20 +60,20 @@ function GameContainer({ initialGameName, onClose, game }) {
       <div className="game-content">
         <button
           onClick={handleCreateAssetMenu}
-          disabled={loading || !game || !game.id}
+          disabled={loading || !game || !game._id}
         >
           {loading ? "Creating..." : "Create Asset Menu"}
         </button>
-        {error && <p style={{ color: "red" }}>Error: {error}</p>}
+        {error && <p style={{ color: "red" }}>{error}</p>}
       </div>
 
-      {/* Render AssetMenus */}
+      {/* Render AssetMenus safely, checking each for null and necessary properties */}
       {assetMenus.length > 0 ? (
         assetMenus
           .filter((menu) => menu && menu.title && menu.position) // Only render valid menus
           .map((menu) => (
             <AssetMenu
-              key={menu.id}
+              key={menu._id}
               title={menu.title}
               position={menu.position}
               assets={menu.assets}
@@ -116,13 +90,13 @@ function GameContainer({ initialGameName, onClose, game }) {
 }
 
 GameContainer.propTypes = {
+  initialGameName: PropTypes.string.isRequired,
+  onClose: PropTypes.func.isRequired,
   game: PropTypes.shape({
-    _id: PropTypes.string.isRequired, // This will now match the database `_id`
-    gameName: PropTypes.string.isRequired,
-    gameDescription: PropTypes.string.isRequired,
+    _id: PropTypes.string.isRequired,
     assetMenus: PropTypes.arrayOf(
       PropTypes.shape({
-        _id: PropTypes.string,
+        _id: PropTypes.string.isRequired,
         title: PropTypes.string,
         position: PropTypes.shape({
           top: PropTypes.number,
@@ -132,7 +106,6 @@ GameContainer.propTypes = {
       })
     ),
   }).isRequired,
-  onClose: PropTypes.func.isRequired,
 };
 
 export default GameContainer;

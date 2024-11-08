@@ -7,8 +7,25 @@ const gameRoutes = require("./routes/GameRoutes");
 const authenticateJWT = require("./middlewares/AuthenticateJWT"); // JWT auth middleware
 const authRoutes = require("./routes/authRoutes"); // Correct import for auth routes
 const User = require("./models/UserModel"); // Import the User model
+const assetMenuRoutes = require("./routes/assetMenuRoutes");
+const multer = require("multer");
 
 const { MONGO_URL, PORT } = process.env;
+
+// Set up file storage with Multer
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    // You can change the folder where assets will be stored
+    const uploadDir = path.join(__dirname, "uploads", "assets");
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + path.extname(file.originalname)); // Unique filenames
+  },
+});
 
 mongoose
   .connect(process.env.MONGO_URL, {
@@ -38,9 +55,9 @@ app.use(express.json());
 // Auth routes
 app.use("/api/auth", authRoutes); // Use the auth routes at /api/auth
 
-// Authentication middleware for game routes
-app.use("/api", authenticateJWT); // Apply authenticate middleware globally for game routes
-app.use("/api/games", gameRoutes); // Game routes
+// Game-related routes should be protected
+app.use("/api/games", authenticateJWT, gameRoutes); // Game routes are now protected
+app.use("/api/games/:gameId/assetMenus", authenticateJWT, assetMenuRoutes);
 
 // User fetch route
 app.get("/api/users", async (req, res) => {

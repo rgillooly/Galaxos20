@@ -2,16 +2,17 @@ import React, { useState, useEffect } from "react";
 import { useUser } from "../context/UserContext";
 import axios from "axios";
 import { Link } from "react-router-dom";
-import GameComponent from "../GameContainer/GameContainer"; // Import GameComponent
+import GameContainer from "../GameContainer/GameContainer";
+import MovableWindow from "../MovableWindow/MovableWindow";
 
 const GameList = () => {
   const { user } = useUser();
   const [gameName, setGameName] = useState("");
   const [gameDescription, setGameDescription] = useState("");
-  const [games, setGames] = useState([]); // State for user's games
+  const [games, setGames] = useState([]);
   const [error, setError] = useState("");
   const [gameLoading, setLoading] = useState(false);
-  const [selectedGame, setSelectedGame] = useState(null); // State for selected game
+  const [selectedGame, setSelectedGame] = useState(null);
 
   // Fetch the user's games on component mount
   useEffect(() => {
@@ -71,7 +72,9 @@ const GameList = () => {
       const response = await axios.post(
         "http://localhost:3001/api/games",
         newGame,
-        { headers: { Authorization: `Bearer ${token}` } }
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
       );
 
       if (response.data.success) {
@@ -127,7 +130,7 @@ const GameList = () => {
       <ul>
         {games.length > 0 ? (
           games.map((game) => (
-            <li key={game._id}>
+            <li key={game._id || game.id}>
               <strong>{game.gameName}</strong>: {game.gameDescription}
               <button onClick={() => setSelectedGame(game)}>Open</button>
             </li>
@@ -137,11 +140,17 @@ const GameList = () => {
         )}
       </ul>
 
-      {selectedGame && (
-        <GameComponent
-          game={selectedGame}
+      {selectedGame && selectedGame._id && (
+        <MovableWindow
+          title={selectedGame.gameName}
           onClose={() => setSelectedGame(null)}
-        />
+        >
+          <GameContainer
+            key={selectedGame._id}
+            game={selectedGame}
+            onClose={() => setSelectedGame(null)}
+          />
+        </MovableWindow>
       )}
 
       <Link to="/logout">Logout</Link>
