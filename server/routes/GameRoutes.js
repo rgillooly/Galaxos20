@@ -100,4 +100,49 @@ router.get("/user", authenticateJWT, async (req, res) => {
   }
 });
 
+router.put("/:id", authenticateJWT, async (req, res) => {
+  const gameId = req.params.id;
+  const { gameName, gameDescription } = req.body;
+
+  try {
+    // Find the game by ID and update its fields
+    const game = await Game.findById(gameId);
+
+    if (!game) {
+      return res.status(404).json({
+        success: false,
+        message: "Game not found",
+      });
+    }
+
+    // Ensure the user is the owner of the game (if needed)
+    if (game.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized to update this game",
+      });
+    }
+
+    // Update game fields
+    game.gameName = gameName || game.gameName;
+    game.gameDescription = gameDescription || game.gameDescription;
+
+    // Save the updated game
+    await game.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Game updated successfully",
+      game,
+    });
+  } catch (error) {
+    console.error("Error updating game:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+});
+
 module.exports = router;

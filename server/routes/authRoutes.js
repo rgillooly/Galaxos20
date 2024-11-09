@@ -12,5 +12,7 @@ router.post("/login", login);
 // Get user route (ensure authentication middleware is applied)
 router.get("/user", authenticateJWT, getUser);
 
+router.get("/games", authenticateJWT);
+
 // Export the router
 module.exports = router;

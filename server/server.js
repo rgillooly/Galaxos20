@@ -15,7 +15,6 @@ const { MONGO_URL, PORT } = process.env;
 // Set up file storage with Multer
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    // You can change the folder where assets will be stored
     const uploadDir = path.join(__dirname, "uploads", "assets");
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
@@ -57,7 +56,12 @@ app.use("/api/auth", authRoutes); // Use the auth routes at /api/auth
 
 // Game-related routes should be protected
 app.use("/api/games", authenticateJWT, gameRoutes); // Game routes are now protected
+
+// Only this route should be used for asset menus associated with a specific game
 app.use("/api/games/:gameId/assetMenus", authenticateJWT, assetMenuRoutes);
+
+// General asset menu routes (for all asset menus not tied to a specific game)
+app.use("/api/assetMenus", authenticateJWT, assetMenuRoutes); 
 
 // User fetch route
 app.get("/api/users", async (req, res) => {

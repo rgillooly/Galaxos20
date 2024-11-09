@@ -1,83 +1,70 @@
 import React, { useState, useRef } from "react";
 import PropTypes from "prop-types";
+import "./AssetMenu.css";
 
-function AssetMenu({ title, assets, position, onClose, onUpdatePosition }) {
+function AssetMenu({ title, assets, position = { top: 0, left: 0 }, onClose, onDragStart, onDragEnd }) {
+  const [assetMenuPosition, setAssetMenuPosition] = useState(position); // Use state for position updates
   const [isDragging, setIsDragging] = useState(false);
-  const [assetMenuPosition, setAssetMenuPosition] = useState(position);
   const dragStart = useRef({ x: 0, y: 0 });
-  const dragOffset = useRef({ x: 0, y: 0 });
 
-  // Handle mouse down event to start dragging
+  // Handle mouse down event for dragging
   const handleMouseDown = (e) => {
     setIsDragging(true);
-    dragStart.current = { x: e.clientX, y: e.clientY };
-    dragOffset.current = {
-      x: assetMenuPosition.left,
-      y: assetMenuPosition.top,
-    };
+    dragStart.current = { x: e.clientX - assetMenuPosition.left, y: e.clientY - assetMenuPosition.top };
+    if (onDragStart) onDragStart();
+    // Add event listeners to handle dragging
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
   };
 
-  // Handle mouse move event during dragging
+  // Handle mouse move event
   const handleMouseMove = (e) => {
     if (isDragging) {
-      const dx = e.clientX - dragStart.current.x;
-      const dy = e.clientY - dragStart.current.y;
-      setAssetMenuPosition({
-        top: dragOffset.current.y + dy,
-        left: dragOffset.current.x + dx,
-      });
+      const newLeft = e.clientX - dragStart.current.x;
+      const newTop = e.clientY - dragStart.current.y;
+      setAssetMenuPosition({ top: newTop, left: newLeft });
     }
   };
 
   // Handle mouse up event to stop dragging
   const handleMouseUp = () => {
     setIsDragging(false);
-    dragStart.current = null;
-    dragOffset.current = { x: 0, y: 0 };
+    if (onDragEnd) onDragEnd();
     document.removeEventListener("mousemove", handleMouseMove);
     document.removeEventListener("mouseup", handleMouseUp);
-
-    // Update AssetMenu position after dragging if onUpdatePosition is provided
-    if (onUpdatePosition) {
-      onUpdatePosition(assetMenuPosition);
-    }
   };
 
   return (
     <div
       className="asset-menu"
       style={{
-        position: "absolute",
-        top: `${assetMenuPosition.top}px`,
-        left: `${assetMenuPosition.left}px`,
         zIndex: 1000, // Ensure it's above other content
       }}
       onMouseDown={handleMouseDown}
     >
-      <header>
+      <header className="asset-menu-header">
         <h3>{title}</h3>
         <button onClick={onClose}>Close</button>
       </header>
-
-      <div>
-        <p>Assets: {assets.length}</p>
-        {/* Render assets here */}
+      <div className="asset-menu-content">
+        <ul>
+          {assets?.length > 0 ? (
+            assets.map((asset) => <li key={asset._id}>{asset.name}</li>)
+          ) : (
+            <li>No assets available</li>
+          )}
+        </ul>
       </div>
     </div>
   );
 }
 
 AssetMenu.propTypes = {
-  title: PropTypes.string.isRequired, // Updated to match the prop in the component
-  position: PropTypes.shape({
-    top: PropTypes.number.isRequired,
-    left: PropTypes.number.isRequired,
-  }).isRequired,
-  assets: PropTypes.array.isRequired,
-  onClose: PropTypes.func.isRequired,
-  onUpdatePosition: PropTypes.func.isRequired,
+  title: PropTypes.string,
+  assets: PropTypes.array,
+  onClose: PropTypes.func,
+  onDragStart: PropTypes.func,
+  onDragEnd: PropTypes.func,
 };
 
 export default AssetMenu;

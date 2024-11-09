@@ -101,16 +101,6 @@ const GameList = () => {
       <h2>Create a New Game</h2>
       <form onSubmit={handleSubmit}>
         <div>
-          <label>Game Name:</label>
-          <input
-            type="text"
-            value={gameName}
-            onChange={(e) => setGameName(e.target.value)}
-            required
-            disabled={gameLoading}
-          />
-        </div>
-        <div>
           <label>Description:</label>
           <input
             type="text"
@@ -147,7 +137,7 @@ const GameList = () => {
         >
           <GameContainer
             key={selectedGame._id}
-            game={selectedGame}
+            game={selectedGame} // Pass the selected game directly
             onClose={() => setSelectedGame(null)}
           />
         </MovableWindow>
