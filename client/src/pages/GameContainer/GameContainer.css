@@ -2,20 +2,17 @@
   box-sizing: border-box; /* Ensures padding and borders are included in element width/height */
 }
 
-/* GameContainer.css */
-.game-container {
-  position: absolute;
-  top: 50px; /* Adjust as needed */
-  left: 50px; /* Adjust as needed */
-  width: 80vw; /* Default width as a percentage of viewport width */
-  height: 70vh; /* Default height as a percentage of viewport height */
-  background-color: #f9f9f9 !important; /* Force background color to be applied */
-  border: 1px solid #ccc; /* Border to see boundaries */
-  box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1); /* Shadow for depth */
-  z-index: 1000; /* Bring to front */
-  overflow: auto;
-  opacity: 1 !important; /* Ensure full opacity */
-}
+  /* Ensure game-container adjusts its size dynamically */
+  .game-container {
+    position: relative;  /* Relative positioning allows resizing inside movable window */
+    width: 100%;  /* Full width of the movable window */
+    height: 100%;  /* Full height of the movable window */
+    background-color: #f9f9f9 !important;
+    border: 1px solid #ccc;
+    box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+    overflow: auto;  /* Enable scrollbars if the content exceeds */
+    opacity: 1 !important;
+  }
 
 html,
 body {
@@ -34,7 +31,7 @@ body {
   display: flex;
   justify-content: space-between; /* Space out header content */
   align-items: center;
-  background-color: #e0e0e0; /* Header background */
+  background-color: #333333; /* Header background */
   padding: 5px; /* Padding for header */
 }
 

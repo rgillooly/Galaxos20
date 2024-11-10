@@ -2,9 +2,11 @@ import React, { useState, useRef } from "react";
 import PropTypes from "prop-types";
 import "./AssetMenu.css";
 
-function AssetMenu({ title, assets, position = { top: 0, left: 0 }, onClose, onDragStart, onDragEnd }) {
+function AssetMenu({ id, title, assets, position = { top: 0, left: 0 }, onClose, onDragStart, onDragEnd, onTitleUpdate }) {
   const [assetMenuPosition, setAssetMenuPosition] = useState(position); // Use state for position updates
   const [isDragging, setIsDragging] = useState(false);
+  const [isEditingTitle, setIsEditingTitle] = useState(false); // To track if title is being edited
+  const [newTitle, setNewTitle] = useState(title); // To store the edited title
   const dragStart = useRef({ x: 0, y: 0 });
 
   // Handle mouse down event for dragging
@@ -34,6 +36,37 @@ function AssetMenu({ title, assets, position = { top: 0, left: 0 }, onClose, onD
     document.removeEventListener("mouseup", handleMouseUp);
   };
 
+  // Start editing the title
+  const handleEditTitle = () => {
+    setIsEditingTitle(true);
+  };
+
+  // Handle title input change
+  const handleTitleChange = (e) => {
+    setNewTitle(e.target.value);
+  };
+
+  // Save the new title
+  const handleSaveTitle = () => {
+    setIsEditingTitle(false);
+    // Notify the parent to update the title in the backend
+    if (onTitleUpdate) {
+      onTitleUpdate(id, newTitle); // Passing id and new title to parent
+    }
+  };
+
+  // Handle blur event (when user clicks away)
+  const handleBlur = () => {
+    handleSaveTitle();
+  };
+
+  // Handle Enter key to save the title
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") {
+      handleSaveTitle();
+    }
+  };
+
   return (
     <div
       className="asset-menu"
@@ -43,7 +76,24 @@ function AssetMenu({ title, assets, position = { top: 0, left: 0 }, onClose, onD
       onMouseDown={handleMouseDown}
     >
       <header className="asset-menu-header">
-        <h3>{title}</h3>
+        {isEditingTitle ? (
+          <input
+            type="text"
+            value={newTitle}
+            onChange={handleTitleChange}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            autoFocus
+            className="edit-input"
+          />
+        ) : (
+          <>
+            <h3>{newTitle}</h3>
+            <button onClick={handleEditTitle} className="rename-button">
+              Rename
+            </button>
+          </>
+        )}
         <button onClick={onClose}>Close</button>
       </header>
       <div className="asset-menu-content">
@@ -60,11 +110,13 @@ function AssetMenu({ title, assets, position = { top: 0, left: 0 }, onClose, onD
 }
 
 AssetMenu.propTypes = {
+  _id: PropTypes.string.isRequired, // Added id for identifying the AssetMenu
   title: PropTypes.string,
   assets: PropTypes.array,
   onClose: PropTypes.func,
   onDragStart: PropTypes.func,
   onDragEnd: PropTypes.func,
+  onTitleUpdate: PropTypes.func, // Callback for updating the title
 };
 
 export default AssetMenu;

@@ -1,6 +1,8 @@
 const express = require("express");
 const Game = require("../models/Game");
 const authenticateJWT = require("../middlewares/AuthenticateJWT"); // Import the authentication middleware
+const mongoose = require("mongoose");
+const { ObjectId } = mongoose.Types;
 
 const router = express.Router();
 
@@ -53,6 +55,30 @@ router.post("/", authenticateJWT, async (req, res) => {
       message: "Server error",
       error: error.message,
     });
+  }
+});
+
+// Update game name
+router.put('/games/:gameId', async (req, res) => {
+  try {
+    const { gameId } = req.params;
+    const { gameName } = req.body;
+
+    // Find the game by ID and update its name
+    const updatedGame = await Game.findByIdAndUpdate(
+      gameId,
+      { gameName },
+      { new: true } // Return the updated game
+    );
+
+    if (!updatedGame) {
+      return res.status(404).json({ success: false, message: 'Game not found' });
+    }
+
+    res.status(200).json({ success: true, game: updatedGame });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
@@ -142,6 +168,19 @@ router.put("/:id", authenticateJWT, async (req, res) => {
       message: "Server error",
       error: error.message,
     });
+  }
+});
+
+router.get('/api/games/:_id', async (req, res) => {
+  try {
+    const game = await Game.findById(req.params._id);
+    if (!game) {
+      return res.status(404).json({ success: false, message: 'Game not found' });
+    }
+    res.status(200).json({ success: true, game });
+  } catch (error) {
+    console.error("Error fetching game:", error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

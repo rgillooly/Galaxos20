@@ -5,6 +5,15 @@ import { Link } from "react-router-dom";
 import GameContainer from "../GameContainer/GameContainer";
 import MovableWindow from "../MovableWindow/MovableWindow";
 
+// Utility function for debouncing
+const debounce = (func, delay) => {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => func(...args), delay);
+  };
+};
+
 const GameList = () => {
   const { user } = useUser();
   const [gameName, setGameName] = useState("");
@@ -13,6 +22,31 @@ const GameList = () => {
   const [error, setError] = useState("");
   const [gameLoading, setLoading] = useState(false);
   const [selectedGame, setSelectedGame] = useState(null);
+
+  const updateGameNameInDB = async (gameId, newName) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.put(
+        `http://localhost:3001/api/games/${gameId}`,
+        { gameName: newName },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (response.data.success) {
+        console.log("Game name updated in the database!");
+        return response.data.game;
+      } else {
+        throw new Error("Failed to update game name in the database");
+      }
+    } catch (error) {
+      console.error("Error updating game name:", error);
+      setError("Failed to update game name.");
+    }
+  };
+
+  const debouncedUpdateGameName = debounce(updateGameNameInDB, 500);
 
   // Fetch the user's games on component mount
   useEffect(() => {
@@ -96,10 +130,42 @@ const GameList = () => {
     }
   };
 
+  // Handle renaming a game
+  const handleRenameSubmit = async (newName) => {
+    if (selectedGame) {
+      try {
+        const updatedGame = await debouncedUpdateGameName(selectedGame._id, newName);
+
+        // After the name is updated in the database, update local state
+        setGames((prevGames) =>
+          prevGames.map((game) =>
+            game._id === selectedGame._id ? { ...game, gameName: newName } : game
+          )
+        );
+        setSelectedGame((prevSelectedGame) => ({
+          ...prevSelectedGame,
+          gameName: newName,
+        }));
+      } catch (error) {
+        console.error("Error renaming game:", error);
+      }
+    }
+  };
+
   return (
     <div>
       <h2>Create a New Game</h2>
       <form onSubmit={handleSubmit}>
+        <div>
+          <label>Game Name:</label>
+          <input
+            type="text"
+            value={gameName}
+            onChange={(e) => setGameName(e.target.value)}
+            required
+            disabled={gameLoading}
+          />
+        </div>
         <div>
           <label>Description:</label>
           <input
@@ -122,7 +188,12 @@ const GameList = () => {
           games.map((game) => (
             <li key={game._id || game.id}>
               <strong>{game.gameName}</strong>: {game.gameDescription}
-              <button onClick={() => setSelectedGame(game)}>Open</button>
+              <button
+                onClick={() => setSelectedGame(game)}
+                disabled={selectedGame && selectedGame._id === game._id} // Disable button for selected game
+              >
+                Open
+              </button>
             </li>
           ))
         ) : (
@@ -139,6 +210,7 @@ const GameList = () => {
             key={selectedGame._id}
             game={selectedGame} // Pass the selected game directly
             onClose={() => setSelectedGame(null)}
+            onRename={handleRenameSubmit} // Pass rename handler
           />
         </MovableWindow>
       )}

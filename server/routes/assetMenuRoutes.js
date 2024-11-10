@@ -76,4 +76,61 @@ router.post("/", async (req, res) => {
   }
 });
 
+router.put('/api/asset-menus/:id', async (req, res) => {
+  try {
+    const { _id } = req.params;
+    const { title } = req.body;
+
+    // Find the asset menu by ID and update the title
+    const updatedMenu = await AssetMenu.findByIdAndUpdate(_id, { title }, { new: true });
+
+    if (!updatedMenu) {
+      return res.status(404).send('Asset menu not found');
+    }
+
+    res.json(updatedMenu);
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Server error');
+  }
+});
+
+router.put("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title } = req.body;
+
+    // Validate input
+    if (!title) {
+      return res.status(400).json({
+        success: false,
+        message: "Title is required",
+      });
+    }
+
+    // Find the asset menu by ID and update the title
+    const updatedMenu = await AssetMenu.findByIdAndUpdate(id, { title }, { new: true });
+
+    if (!updatedMenu) {
+      return res.status(404).json({
+        success: false,
+        message: "Asset menu not found",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Asset menu updated successfully",
+      assetMenu: updatedMenu,
+    });
+  } catch (error) {
+    console.error("Error updating asset menu:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+});
+
 module.exports = router;

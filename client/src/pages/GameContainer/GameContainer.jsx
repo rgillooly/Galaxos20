@@ -5,18 +5,17 @@ import AssetMenu from "../AssetMenu/AssetMenu";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 import "./GameContainer.css";
 
-function GameContainer({ initialGameName = "Untitled Game", onClose, game = {} }) {
-  const { _id: gameId = null, name = "", assetMenus: initialAssetMenus = [] } = game;
+function GameContainer({ onClose, game = {} }) {
+  const { _id: gameId = null, gameName = "", assetMenus: initialAssetMenus = [] } = game;
 
-  const [windowTitle, setWindowTitle] = useState(initialGameName || name);
+  const [windowTitle, setWindowTitle] = useState(gameName); // Initialize title from gameName passed from GameList
   const [assetMenus, setAssetMenus] = useState(initialAssetMenus);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [isRenaming, setIsRenaming] = useState(false); // State to toggle renaming mode
+  const [newName, setNewName] = useState(gameName); // Local state for new name input
 
-  useEffect(() => {
-    if (name) setWindowTitle(name);
-  }, [name]);
-
+  // Debounce function to avoid too frequent API calls
   const debounce = (func, delay) => {
     let timer;
     return (...args) => {
@@ -25,18 +24,17 @@ function GameContainer({ initialGameName = "Untitled Game", onClose, game = {} }
     };
   };
 
-  // Fetch asset menus directly by `gameId`
+  // Fetch asset menus for the game on initial load
   useEffect(() => {
-    if (game && game._id) {
+    if (gameId) {
       setIsLoading(true);
       axios
-        .get(`http://localhost:3001/api/assetMenus?gameId=${game._id}`, {
+        .get(`http://localhost:3001/api/assetMenus?gameId=${gameId}`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         })
         .then((response) => {
-          console.log("Fetched Asset Menus:", response.data); // Log response
           setAssetMenus(response.data);
           setIsLoading(false);
         })
@@ -45,21 +43,23 @@ function GameContainer({ initialGameName = "Untitled Game", onClose, game = {} }
           setIsLoading(false);
         });
     }
-  }, [game]); // Run effect every time the game prop changes
+  }, [gameId]);
 
   const updateGameName = async (newName) => {
-    if (newName === name) return;
+    if (newName === gameName) return;  // Avoid unnecessary updates if the name is unchanged
     setIsLoading(true);
     try {
       const token = localStorage.getItem("token");
       await axios.put(
         `http://localhost:3001/api/games/${gameId}`,
-        { name: newName },
+        { gameName: newName },
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
       console.log("Game name updated successfully!");
+      setIsRenaming(false); // Exit renaming mode after successful update
+      setWindowTitle(newName); // Update the window title immediately
     } catch (error) {
       console.error("Error updating game name:", error.response?.data || error);
       setError("Failed to update game name.");
@@ -71,9 +71,22 @@ function GameContainer({ initialGameName = "Untitled Game", onClose, game = {} }
   const debouncedUpdateGameName = debounce(updateGameName, 500);
 
   const handleNameChange = (e) => {
-    const newName = e.target.value;
-    setWindowTitle(newName);
-    debouncedUpdateGameName(newName);
+    setNewName(e.target.value); // Update the new name locally
+  };
+
+  const handleRenameButtonClick = () => {
+    setIsRenaming(true); // Toggle to renaming mode
+  };
+
+  const handleRenameSubmit = () => {
+    if (newName.trim() && newName !== windowTitle) {
+      updateGameName(newName); // Direct call without debounce
+    }
+  };  
+
+  const handleCancelRename = () => {
+    setIsRenaming(false); // Cancel renaming mode
+    setNewName(gameName); // Reset to original name if cancelled
   };
 
   const handleCreateAssetMenu = async () => {
@@ -93,7 +106,7 @@ function GameContainer({ initialGameName = "Untitled Game", onClose, game = {} }
       };
 
       const response = await axios.post(
-        `http://localhost:3001/api/assetMenus`, // Directly creating an asset menu
+        `http://localhost:3001/api/assetMenus`,
         {
           title: "New Asset Menu",
           position,
@@ -132,25 +145,74 @@ function GameContainer({ initialGameName = "Untitled Game", onClose, game = {} }
     setAssetMenus(reorderedMenus); // Update state with reordered menus
   };
 
+    // Handle the title update in the parent component
+    const handleTitleUpdate = async (_id, newTitle) => {
+      try {
+        const response = await fetch(`/api/asset-menus/${_id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ title: newTitle }), // Send the updated title
+        });
+  
+        if (response.ok) {
+          const updatedMenu = await response.json();
+          // Update the title in the state to reflect the changes
+          setAssetMenus((prevMenus) =>
+            prevMenus.map((menu) =>
+              menu.id === _id ? { ...menu, title: updatedMenu.assetMenu.title } : menu
+            )
+          );
+          console.log("Title updated successfully");
+        } else {
+          console.error("Failed to update title");
+        }
+      } catch (error) {
+        console.error("Error updating title:", error);
+      }
+    };
+
   return (
     <div className="game-container">
-      <header className="game-header">
-        <input
-          type="text"
-          value={windowTitle}
-          onChange={handleNameChange}
-          placeholder="Game Name"
-          disabled={isLoading}
-        />
-        <button onClick={onClose} disabled={isLoading}>
-          Close
-        </button>
-      </header>
-      <button onClick={handleCreateAssetMenu} disabled={isLoading || !game || !game._id}>
+      <div className="game-name-container">
+        <h1>{windowTitle}</h1>
+
+        {/* Rename Button */}
+        {!isRenaming && (
+          <button onClick={handleRenameButtonClick} disabled={isLoading}>
+            Rename
+          </button>
+        )}
+
+        {/* Editable Name Input */}
+        {isRenaming && (
+          <div>
+            <input
+              type="text"
+              value={newName} // The new name being entered
+              onChange={handleNameChange} // Update the name locally
+              disabled={isLoading}
+            />
+            <button onClick={handleRenameSubmit} disabled={isLoading}>
+              Submit
+            </button>
+            <button onClick={handleCancelRename} disabled={isLoading}>
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Create Asset Menu Button */}
+      <button onClick={handleCreateAssetMenu} disabled={isLoading || !gameId}>
         {isLoading ? "Creating..." : "Create Asset Menu"}
       </button>
+
+      {/* Error Display */}
       {error && <p style={{ color: "red" }}>{error}</p>}
 
+      {/* Loading State for Asset Menus */}
       {isLoading ? (
         <p>Loading asset menus...</p>
       ) : (
@@ -175,6 +237,7 @@ function GameContainer({ initialGameName = "Untitled Game", onClose, game = {} }
                           title={menu.title}
                           assets={menu.assets}
                           onClose={() => handleCloseAssetMenu(menu._id)}
+                          onTitleUpdate={handleTitleUpdate}
                         />
                       </div>
                     )}
@@ -194,7 +257,7 @@ GameContainer.propTypes = {
   onClose: PropTypes.func.isRequired,
   game: PropTypes.shape({
     _id: PropTypes.string,
-    name: PropTypes.string,
+    gameName: PropTypes.string,
     assetMenus: PropTypes.arrayOf(
       PropTypes.shape({
         _id: PropTypes.string.isRequired,

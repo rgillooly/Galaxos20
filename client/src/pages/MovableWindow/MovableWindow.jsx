@@ -1,12 +1,15 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
+import "./MovableWindow.css";
 
 const MovableWindow = ({ children, title, onClose }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: 100, y: 100 });
-  const dragStart = useRef({ x: 0, y: 0 });
   const windowRef = useRef(null);
+  const contentRef = useRef(null); // Ref to observe content size changes
+  const dragStart = useRef({ x: 0, y: 0 });
 
+  // Mouse down event for initiating dragging
   const handleMouseDown = (e) => {
     setIsDragging(true);
     dragStart.current = {
@@ -15,26 +18,31 @@ const MovableWindow = ({ children, title, onClose }) => {
     };
   };
 
+  // Mouse move event for updating the position while dragging
   const handleMouseMove = (e) => {
     if (isDragging) {
-      const newPosition = {
-        x: e.clientX - dragStart.current.x,
-        y: e.clientY - dragStart.current.y,
-      };
+      requestAnimationFrame(() => {
+        const newPosition = {
+          x: e.clientX - dragStart.current.x,
+          y: e.clientY - dragStart.current.y,
+        };
 
-      const maxX = window.innerWidth - windowRef.current.offsetWidth;
-      const maxY = window.innerHeight - windowRef.current.offsetHeight;
-      const clampedX = Math.max(0, Math.min(newPosition.x, maxX));
-      const clampedY = Math.max(0, Math.min(newPosition.y, maxY));
+        const maxX = window.innerWidth - windowRef.current.offsetWidth;
+        const maxY = window.innerHeight - windowRef.current.offsetHeight;
+        const clampedX = Math.max(0, Math.min(newPosition.x, maxX));
+        const clampedY = Math.max(0, Math.min(newPosition.y, maxY));
 
-      setPosition({ x: clampedX, y: clampedY });
+        setPosition({ x: clampedX, y: clampedY });
+      });
     }
   };
 
+  // Mouse up event to stop dragging
   const handleMouseUp = () => {
     setIsDragging(false);
   };
 
+  // Adding mouse event listeners for dragging the window
   useEffect(() => {
     if (isDragging) {
       window.addEventListener("mousemove", handleMouseMove);
@@ -62,32 +70,26 @@ const MovableWindow = ({ children, title, onClose }) => {
         userSelect: "none",
       }}
     >
-      <header
-        className="movable-window-header"
-        onMouseDown={handleMouseDown}
-        style={{
-          cursor: "move",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "5px",
-          backgroundColor: "#ddd",
-          borderBottom: "1px solid #aaa",
-        }}
-      >
-        <span>{title}</span>
-        {onClose && <button onClick={onClose}>Close</button>}
+      <header className="movable-window-header" onMouseDown={handleMouseDown}>
+        {title && <span>{title}</span>}
+        {onClose && (
+          <button onClick={onClose} style={{ background: "none", border: "none" }}>
+            X
+          </button>
+        )}
       </header>
 
-      <div className="movable-window-content">{children}</div>
+      <div className="movable-window-content" ref={contentRef}>
+        {children}
+      </div>
     </div>
   );
 };
 
 MovableWindow.propTypes = {
-  onClose: PropTypes.func, // Made onClose optional
-  title: PropTypes.string,
-  children: PropTypes.node.isRequired,
+  onClose: PropTypes.func, // Optional onClose function
+  title: PropTypes.string, // Optional title
+  children: PropTypes.node.isRequired, // Content to be rendered inside
 };
 
 export default MovableWindow;
