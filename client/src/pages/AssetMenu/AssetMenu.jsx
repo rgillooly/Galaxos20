@@ -1,25 +1,33 @@
 import React, { useState, useRef } from "react";
 import PropTypes from "prop-types";
+import axios from "axios";
 import "./AssetMenu.css";
 
-function AssetMenu({ id, title, assets, position = { top: 0, left: 0 }, onClose, onDragStart, onDragEnd, onTitleUpdate }) {
-  const [assetMenuPosition, setAssetMenuPosition] = useState(position); // Use state for position updates
+function AssetMenu({
+  id,
+  title,
+  assets = [],
+  position = { top: 0, left: 0 },
+  onClose,
+  onDragStart,
+  onDragEnd,
+  onTitleUpdate,
+  onDrop, // Add onDrop callback to notify parent about the drop
+}) {
+  const [assetMenuPosition, setAssetMenuPosition] = useState(position);
   const [isDragging, setIsDragging] = useState(false);
-  const [isEditingTitle, setIsEditingTitle] = useState(false); // To track if title is being edited
-  const [newTitle, setNewTitle] = useState(title); // To store the edited title
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [newTitle, setNewTitle] = useState(title);
   const dragStart = useRef({ x: 0, y: 0 });
 
-  // Handle mouse down event for dragging
   const handleMouseDown = (e) => {
     setIsDragging(true);
     dragStart.current = { x: e.clientX - assetMenuPosition.left, y: e.clientY - assetMenuPosition.top };
     if (onDragStart) onDragStart();
-    // Add event listeners to handle dragging
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
   };
 
-  // Handle mouse move event
   const handleMouseMove = (e) => {
     if (isDragging) {
       const newLeft = e.clientX - dragStart.current.x;
@@ -28,52 +36,68 @@ function AssetMenu({ id, title, assets, position = { top: 0, left: 0 }, onClose,
     }
   };
 
-  // Handle mouse up event to stop dragging
   const handleMouseUp = () => {
     setIsDragging(false);
     if (onDragEnd) onDragEnd();
+    if (onDrop) onDrop(id, assetMenuPosition); // Notify parent of the drop
     document.removeEventListener("mousemove", handleMouseMove);
     document.removeEventListener("mouseup", handleMouseUp);
   };
 
-  // Start editing the title
-  const handleEditTitle = () => {
-    setIsEditingTitle(true);
-  };
-
-  // Handle title input change
   const handleTitleChange = (e) => {
     setNewTitle(e.target.value);
   };
 
-  // Save the new title
-  const handleSaveTitle = () => {
+  const handleEditTitle = () => {
+    setIsEditingTitle(true);
+  };
+
+  const handleSaveTitle = async () => {
+    if (!newTitle.trim()) {
+      console.error("Title is required and cannot be empty.");
+      setNewTitle(title); // Reset to original title
+      setIsEditingTitle(false);
+      return;
+    }
+  
     setIsEditingTitle(false);
-    // Notify the parent to update the title in the backend
-    if (onTitleUpdate) {
-      onTitleUpdate(id, newTitle); // Passing id and new title to parent
+  
+    try {
+      const token = localStorage.getItem("token");
+      
+      // Ensure we're sending the correct data in the body (title and id)
+      const response = await axios.put(
+        `http://localhost:3001/api/assetMenus/${id}`,  // Make sure this URL is correct
+        { title: newTitle },  // Title to be updated
+        { headers: { Authorization: `Bearer ${token}` } }  // Pass token in the header if needed
+      );
+  
+      if (response.status === 200) {
+        // Successfully updated title in the backend
+        console.log("Title updated:", response.data);
+        if (onTitleUpdate) {
+          // Pass both id and newTitle to the parent
+          onTitleUpdate(id, newTitle);
+        }
+      }
+    } catch (error) {
+      console.error("Error saving the title:", error.response ? error.response.data : error);
     }
   };
-
-  // Handle blur event (when user clicks away)
+      
   const handleBlur = () => {
-    handleSaveTitle();
+    if (isEditingTitle) handleSaveTitle();
   };
 
-  // Handle Enter key to save the title
   const handleKeyDown = (e) => {
-    if (e.key === "Enter") {
-      handleSaveTitle();
-    }
+    if (e.key === "Enter") handleSaveTitle();
   };
 
   return (
     <div
       className="asset-menu"
-      style={{
-        zIndex: 1000, // Ensure it's above other content
-      }}
       onMouseDown={handleMouseDown}
+      style={{ top: `${assetMenuPosition.top}px`, left: `${assetMenuPosition.left}px` }}
     >
       <header className="asset-menu-header">
         {isEditingTitle ? (
@@ -87,18 +111,13 @@ function AssetMenu({ id, title, assets, position = { top: 0, left: 0 }, onClose,
             className="edit-input"
           />
         ) : (
-          <>
-            <h3>{newTitle}</h3>
-            <button onClick={handleEditTitle} className="rename-button">
-              Rename
-            </button>
-          </>
+          <h3 onClick={handleEditTitle}>{newTitle}</h3>
         )}
         <button onClick={onClose}>Close</button>
       </header>
       <div className="asset-menu-content">
         <ul>
-          {assets?.length > 0 ? (
+          {assets.length > 0 ? (
             assets.map((asset) => <li key={asset._id}>{asset.name}</li>)
           ) : (
             <li>No assets available</li>
@@ -110,13 +129,15 @@ function AssetMenu({ id, title, assets, position = { top: 0, left: 0 }, onClose,
 }
 
 AssetMenu.propTypes = {
-  _id: PropTypes.string.isRequired, // Added id for identifying the AssetMenu
+  id: PropTypes.string.isRequired,
   title: PropTypes.string,
   assets: PropTypes.array,
+  position: PropTypes.shape({ top: PropTypes.number, left: PropTypes.number }),
   onClose: PropTypes.func,
   onDragStart: PropTypes.func,
   onDragEnd: PropTypes.func,
-  onTitleUpdate: PropTypes.func, // Callback for updating the title
+  onTitleUpdate: PropTypes.func,
+  onDrop: PropTypes.func, // New prop to handle drop event
 };
 
 export default AssetMenu;
