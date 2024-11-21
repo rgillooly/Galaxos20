@@ -10,7 +10,15 @@ const debounce = (func, delay) => {
   let timer;
   return (...args) => {
     clearTimeout(timer);
-    timer = setTimeout(() => func(...args), delay);
+    return new Promise((resolve, reject) => {
+      timer = setTimeout(() => {
+        try {
+          resolve(func(...args)); // Resolve after function execution
+        } catch (error) {
+          reject(error); // Reject if an error occurs
+        }
+      }, delay);
+    });
   };
 };
 
@@ -23,16 +31,20 @@ const GameList = () => {
   const [error, setError] = useState("");
   const [gameLoading, setLoading] = useState(false);
 
-  // Consolidated fetch user games on component mount
+  const handleChildUpdate = (newData) => {
+    setParentData(newData);
+  };
+
+  // Fetch user games on component mount
   useEffect(() => {
     const fetchUserGames = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        if (!token) {
-          setError("Token not found");
-          return;
-        }
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setError("You must be logged in to view your games.");
+        return;
+      }
 
+      try {
         const response = await axios.get(
           "http://localhost:3001/api/games/user",
           {
@@ -49,7 +61,7 @@ const GameList = () => {
         console.error("Error fetching games:", error);
         setError(
           error.response?.data?.message ||
-          "An error occurred while fetching games."
+            "An error occurred while fetching games."
         );
       }
     };
@@ -57,58 +69,85 @@ const GameList = () => {
     fetchUserGames();
   }, []);
 
-  // API call to update game name
-  const updateGameNameInDB = async (gameId, newName) => {
+  // Update game description in the backend
+  const updateGameDescriptionInDB = async (gameId, newDescription) => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.put(
-        `http://localhost:3001/api/games/${gameId}`,
-        { gameName: newName },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        `http://localhost:3001/api/games/${gameId}/description`,
+        { description: newDescription },
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
       if (response.data.success) {
-        console.log("Game name updated in the database!");
-        return response.data.game;
+        return response.data.game; // Return updated game
       } else {
-        throw new Error("Failed to update game name in the database");
+        throw new Error("Failed to update description in the database.");
       }
     } catch (error) {
-      console.error("Error updating game name:", error);
-      setError("Failed to update game name.");
+      console.error("Error updating game description:", error);
+      setError("Failed to update game description.");
+      return null;
     }
   };
 
-  const debouncedUpdateGameName = debounce(updateGameNameInDB, 500);
+  const debouncedUpdateGameDescription = debounce(
+    async (gameId, newDescription) => {
+      if (newDescription === selectedGame.gameDescription) return; // Don't update if there's no change
+      return updateGameDescriptionInDB(gameId, newDescription);
+    },
+    500
+  ); // Adjust delay (500ms) as per your requirement
 
-  // Handle renaming a game and update the state immediately
+  // GameList.jsx
+  const handleDescriptionChange = async (newDescription) => {
+    if (typeof newDescription === "string") {
+      // Update selectedGame description immediately for instant UI update
+      setSelectedGame((prev) => ({
+        ...prev,
+        gameDescription: newDescription,
+      }));
+
+      // Update games array to keep state in sync
+      setGames((prevGames) =>
+        prevGames.map((game) =>
+          game._id === selectedGame._id
+            ? { ...game, gameDescription: newDescription }
+            : game
+        )
+      );
+
+      // Use debounced function to update the backend asynchronously
+      await debouncedUpdateGameDescription(selectedGame._id, newDescription);
+    } else {
+      console.error("Invalid description:", newDescription);
+    }
+  };
+
   const handleRename = (gameId, newName) => {
-    // Update state instantly for user feedback
+    // Update selectedGame name immediately for instant UI update
+    setSelectedGame((prev) => ({
+      ...prev,
+      gameName: newName,
+    }));
+
+    // Update games array to keep state in sync
     setGames((prevGames) =>
       prevGames.map((game) =>
         game._id === gameId ? { ...game, gameName: newName } : game
       )
     );
-    if (selectedGame && selectedGame._id === gameId) {
-      setSelectedGame((prevSelectedGame) => ({
-        ...prevSelectedGame,
-        gameName: newName,
-      }));
-    }
 
-    // Update the name in the database after debouncing
-    debouncedUpdateGameName(gameId, newName);
+    // Call backend to update game name (if needed, similar to description)
+    // debouncedUpdateGameName(gameId, newName);
   };
 
-  // Handle form submission to create a new game
   const handleSubmit = async (event) => {
     event.preventDefault();
 
     const token = localStorage.getItem("token");
     if (!token) {
-      console.error("Token not found");
+      setError("You must be logged in to create a game.");
       return;
     }
 
@@ -122,7 +161,6 @@ const GameList = () => {
 
     try {
       const newGame = { gameName, gameDescription, user: user._id };
-
       const response = await axios.post(
         "http://localhost:3001/api/games",
         newGame,
@@ -140,10 +178,9 @@ const GameList = () => {
         setError(response.data.message || "Failed to create game.");
       }
     } catch (error) {
-      console.error("Error creating game:", error);
       setError(
         error.response?.data?.message ||
-        "An error occurred while creating the game."
+          "An error occurred while creating the game."
       );
     } finally {
       setLoading(false);
@@ -168,8 +205,8 @@ const GameList = () => {
           <label>Description:</label>
           <input
             type="text"
-            value={gameDescription}
-            onChange={(e) => setGameDescription(e.target.value)}
+            value={gameDescription} // Controlled input for description
+            onChange={handleDescriptionChange} // Correct event handler
             required
             disabled={gameLoading}
           />
@@ -178,17 +215,16 @@ const GameList = () => {
           {gameLoading ? "Creating..." : "Create Game"}
         </button>
       </form>
-      {error && <p style={{ color: "red" }}>{error}</p>}
-
+      {error && <div className="error-message">{error}</div>}
       <h3>Your Games</h3>
       <ul>
         {games.length > 0 ? (
           games.map((game) => (
-            <li key={game._id || game.id}>
+            <li key={game._id}>
               <strong>{game.gameName}</strong>: {game.gameDescription}
               <button
                 onClick={() => setSelectedGame(game)}
-                disabled={selectedGame && selectedGame._id === game._id} // Disable button for selected game
+                disabled={selectedGame && selectedGame._id === game._id}
               >
                 Open
               </button>
@@ -198,21 +234,22 @@ const GameList = () => {
           <p>No games created yet.</p>
         )}
       </ul>
-
       {selectedGame && selectedGame._id && (
         <MovableWindow
           title={selectedGame.gameName}
           onClose={() => setSelectedGame(null)}
         >
           <GameContainer
-            key={selectedGame._id} // Updated here to avoid missing props reference
+            key={selectedGame._id}
             game={selectedGame}
             onRename={(newName) => handleRename(selectedGame._id, newName)}
-            onClose={() => console.log("Closing GameContainer")}
+            onClose={() => setSelectedGame(null)}
+            description={selectedGame.gameDescription}
+            onDescriptionChange={(newDesc) => handleDescriptionChange(newDesc)}
+            onChildUpdate={handleChildUpdate}
           />
         </MovableWindow>
       )}
-
       <Link to="/logout">Logout</Link>
     </div>
   );

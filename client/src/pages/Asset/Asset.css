@@ -1,0 +1,20 @@
+.asset {
+  border: 1px solid #ddd;
+  padding: 10px;
+  margin: 10px;
+  border-radius: 8px;
+}
+
+.asset-image {
+  max-width: 100%;
+  max-height: 300px;
+  display: block;
+  margin: 0 auto;
+}
+
+.asset-text {
+  font-family: monospace;
+  white-space: pre-wrap; /* Ensures text wraps properly */
+  word-wrap: break-word;
+  color: #333;
+}

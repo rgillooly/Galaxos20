@@ -2,15 +2,15 @@
   box-sizing: border-box; /* Ensures padding and borders are included in element width/height */
 }
 
-  /* Ensure game-container adjusts its size dynamically */
+/* Ensure game-container adjusts its size dynamically */
 .game-container {
-  position: relative;  /* Relative positioning allows resizing inside movable window */
-  width: 100%;  /* Full width of the movable window */
-  height: 100%;  /* Full height of the movable window */
+  position: relative; /* Relative positioning allows resizing inside movable window */
+  width: 100%; /* Full width of the movable window */
+  height: 100%; /* Full height of the movable window */
   background-color: #f9f9f9 !important;
   border: 1px solid #ccc;
   box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
-  overflow: auto;  /* Enable scrollbars if the content exceeds */
+  overflow: auto; /* Enable scrollbars if the content exceeds */
   opacity: 1 !important;
 }
 
@@ -90,7 +90,10 @@ body {
 /* Grid container for the asset menus */
 .asset-menu-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); /* Responsive grid layout */
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(200px, 1fr)
+  ); /* Responsive grid layout */
   gap: 16px; /* Space between grid items */
   padding: 16px;
   overflow-y: auto; /* Allow scrolling if there are many items */
@@ -113,4 +116,11 @@ body {
 /* Ensure z-index is set for dragging */
 .asset-menu-grid-item .asset-menu {
   z-index: 10;
+}
+
+/* In GameContainer.css */
+.asset-menus-list {
+  display: flex; /* This ensures the items flow horizontally */
+  gap: 10px; /* Optional, adds space between the asset menus */
+  overflow-x: auto; /* Adds horizontal scrolling if needed */
 }

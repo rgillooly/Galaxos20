@@ -61,7 +61,9 @@ app.use("/api/games", authenticateJWT, gameRoutes); // Game routes are now prote
 app.use("/api/games/:gameId/assetMenus", authenticateJWT, assetMenuRoutes);
 
 // General asset menu routes (for all asset menus not tied to a specific game)
-app.use("/api/assetMenus", authenticateJWT, assetMenuRoutes); 
+app.use("/api/assetMenus", authenticateJWT, assetMenuRoutes);
+app.use("/api", assetMenuRoutes);
+app.use("/api", gameRoutes);
 
 // User fetch route
 app.get("/api/users", async (req, res) => {

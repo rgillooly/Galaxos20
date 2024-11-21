@@ -58,30 +58,6 @@ router.post("/", authenticateJWT, async (req, res) => {
   }
 });
 
-// Update game name
-router.put('/games/:gameId', async (req, res) => {
-  try {
-    const { gameId } = req.params;
-    const { gameName } = req.body;
-
-    // Find the game by ID and update its name
-    const updatedGame = await Game.findByIdAndUpdate(
-      gameId,
-      { gameName },
-      { new: true } // Return the updated game
-    );
-
-    if (!updatedGame) {
-      return res.status(404).json({ success: false, message: 'Game not found' });
-    }
-
-    res.status(200).json({ success: true, game: updatedGame });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
-});
-
 // routes/gameRoutes.js
 router.get("/games", authenticateJWT, async (req, res) => {
   try {
@@ -103,7 +79,7 @@ router.get("/games", authenticateJWT, async (req, res) => {
 router.get("/user", authenticateJWT, async (req, res) => {
   try {
     // Ensure the user is authenticated
-    if (!req.user || !req.user.userId) {
+    if (!req.user || !req.user._id) {
       return res
         .status(401)
         .json({ success: false, message: "User not authenticated" });
@@ -171,17 +147,123 @@ router.put("/:id", authenticateJWT, async (req, res) => {
   }
 });
 
-router.get('/api/games/:_id', async (req, res) => {
+router.get("/api/games/:_id", async (req, res) => {
   try {
     const game = await Game.findById(req.params._id);
     if (!game) {
-      return res.status(404).json({ success: false, message: 'Game not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Game not found" });
     }
     res.status(200).json({ success: true, game });
   } catch (error) {
     console.error("Error fetching game:", error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
+// Title update route should be placed after to avoid route conflicts
+router.put("/title-update/:id", async (req, res) => {
+  const { id } = req.params; // Extract the ID from the URL params
+  const { title } = req.body; // Get the new title from the request body
+
+  console.log("Updating title for ID:", id); // Log the incoming request for debugging
+
+  // Validate ObjectId format
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ message: "Invalid ID format" });
+  }
+
+  // Validate the title (make sure it's not empty)
+  if (!title || title.trim() === "") {
+    return res.status(400).json({ message: "Title cannot be empty" });
+  }
+
+  try {
+    const assetMenu = await AssetMenu.findById(id);
+    if (!assetMenu) {
+      return res.status(404).json({ message: "AssetMenu not found" });
+    }
+
+    // Update only the title field with the received title
+    assetMenu.title = title.trim(); // Ensure the title is trimmed of spaces
+    await assetMenu.save();
+
+    console.log("Updated AssetMenu:", assetMenu); // Log the updated asset menu
+
+    res.status(200).json({
+      success: true,
+      message: "Asset menu title updated successfully",
+      assetMenu,
+    });
+  } catch (error) {
+    console.error("Error updating AssetMenu:", error);
+    res.status(500).json({ message: "Error updating AssetMenu", error });
+  }
+});
+
+// Route to update game description
+router.put("/:gameId/description", authenticateJWT, async (req, res) => {
+  const { gameId } = req.params;
+  const { description } = req.body;
+
+  console.log(`Attempting to update game description for Game ID: ${gameId}`);
+
+  // Validate gameId format
+  if (!mongoose.Types.ObjectId.isValid(gameId)) {
+    return res.status(400).json({ message: "Invalid game ID format" });
+  }
+
+  // Ensure description is not empty
+  if (!description || description.trim() === "") {
+    return res.status(400).json({ message: "Description cannot be empty" });
+  }
+
+  try {
+    // Find the game by its ID and verify ownership
+    const game = await Game.findById(gameId);
+    if (!game) {
+      console.log(`Game not found with ID: ${gameId}`);
+      return res.status(404).json({ message: "Game not found" });
+    }
+
+    // Optional: Verify that the logged-in user is the owner
+    if (game.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to update this game",
+      });
+    }
+
+    // Update the game description
+    game.gameDescription = description.trim();
+    await game.save();
+
+    console.log("Updated game description:", game.gameDescription);
+
+    // Return the updated game
+    res.status(200).json({ success: true, game });
+  } catch (err) {
+    console.error("Error updating game description:", err.message);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
+// Other routes (make sure they come after the description route)
+// router.put("/games/:gameId", async (req, res) => {
+//   const { gameId } = req.params;
+//   const { gameName } = req.body;
+
+//   // Handle updating game name
+//   const updatedGame = await Game.findByIdAndUpdate(
+//     gameId,
+//     { gameName },
+//     { new: true }
+//   );
+//   if (!updatedGame) {
+//     return res.status(404).json({ success: false, message: "Game not found" });
+//   }
+//   res.status(200).json({ success: true, game: updatedGame });
+// });
 
 module.exports = router;

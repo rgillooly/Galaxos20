@@ -1,0 +1,27 @@
+/* GameContainer.css */
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 100px); /* Adjust cell size */
+  grid-template-rows: repeat(auto-fill, 100px); /* Adjust cell size */
+  gap: 10px; /* Spacing between grid cells */
+  position: relative;
+  width: 100%; /* Adjust based on your container */
+  height: 100%; /* Adjust based on your container */
+}
+
+.grid-item {
+  width: 100px; /* Match grid cell size */
+  height: 100px; /* Match grid cell size */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+/* SnapGrid.css */
+.snap-grid {
+  display: grid;
+  border: 1px solid #ccc;
+  background-color: #f0f0f0;
+  position: relative;
+}

@@ -4,7 +4,7 @@ import axios from "axios";
 import "./AssetMenu.css";
 
 function AssetMenu({
-  id,
+  _id,
   title,
   assets = [],
   position = { top: 0, left: 0 },
@@ -13,6 +13,7 @@ function AssetMenu({
   onDragEnd,
   onTitleUpdate,
   onDrop, // Add onDrop callback to notify parent about the drop
+  provided, // Added provided from react-beautiful-dnd if necessary
 }) {
   const [assetMenuPosition, setAssetMenuPosition] = useState(position);
   const [isDragging, setIsDragging] = useState(false);
@@ -22,7 +23,10 @@ function AssetMenu({
 
   const handleMouseDown = (e) => {
     setIsDragging(true);
-    dragStart.current = { x: e.clientX - assetMenuPosition.left, y: e.clientY - assetMenuPosition.top };
+    dragStart.current = {
+      x: e.clientX - assetMenuPosition.left,
+      y: e.clientY - assetMenuPosition.top,
+    };
     if (onDragStart) onDragStart();
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
@@ -59,19 +63,19 @@ function AssetMenu({
       setIsEditingTitle(false);
       return;
     }
-  
+
     setIsEditingTitle(false);
-  
+
     try {
       const token = localStorage.getItem("token");
-      
+
       // Ensure we're sending the correct data in the body (title and id)
       const response = await axios.put(
-        `http://localhost:3001/api/assetMenus/${id}`,  // Make sure this URL is correct
-        { title: newTitle },  // Title to be updated
-        { headers: { Authorization: `Bearer ${token}` } }  // Pass token in the header if needed
+        `http://localhost:3001/api/assetMenus/title-update/${_id}`, // Correct URL matching the updated route
+        { title: newTitle }, // Title to be updated
+        { headers: { Authorization: `Bearer ${token}` } } // Pass token if needed
       );
-  
+
       if (response.status === 200) {
         // Successfully updated title in the backend
         console.log("Title updated:", response.data);
@@ -81,10 +85,13 @@ function AssetMenu({
         }
       }
     } catch (error) {
-      console.error("Error saving the title:", error.response ? error.response.data : error);
+      console.error(
+        "Error saving the title:",
+        error.response ? error.response.data : error
+      );
     }
   };
-      
+
   const handleBlur = () => {
     if (isEditingTitle) handleSaveTitle();
   };
@@ -97,7 +104,13 @@ function AssetMenu({
     <div
       className="asset-menu"
       onMouseDown={handleMouseDown}
-      style={{ top: `${assetMenuPosition.top}px`, left: `${assetMenuPosition.left}px` }}
+      style={{
+        top: `${assetMenuPosition.top}px`,
+        left: `${assetMenuPosition.left}px`,
+      }}
+      ref={provided ? provided.innerRef : undefined} // Added innerRef for drag functionality
+      {...provided?.draggableProps}
+      {...provided?.dragHandleProps}
     >
       <header className="asset-menu-header">
         {isEditingTitle ? (
@@ -129,15 +142,13 @@ function AssetMenu({
 }
 
 AssetMenu.propTypes = {
-  id: PropTypes.string.isRequired,
-  title: PropTypes.string,
-  assets: PropTypes.array,
-  position: PropTypes.shape({ top: PropTypes.number, left: PropTypes.number }),
-  onClose: PropTypes.func,
-  onDragStart: PropTypes.func,
-  onDragEnd: PropTypes.func,
-  onTitleUpdate: PropTypes.func,
-  onDrop: PropTypes.func, // New prop to handle drop event
+  _id: PropTypes.string.isRequired,
+  title: PropTypes.string.isRequired,
+  position: PropTypes.shape({
+    top: PropTypes.number.isRequired,
+    left: PropTypes.number.isRequired,
+  }).isRequired,
+  order: PropTypes.number.isRequired,
 };
 
 export default AssetMenu;
