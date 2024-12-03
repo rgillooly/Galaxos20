@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import PropTypes from "prop-types";
 import axios from "axios";
 import AssetMenu from "../AssetMenu/AssetMenu";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import SnapGrid from "../SnapGrid/SnapGrid";
 import { useDispatch, useSelector } from "react-redux";
-import { addItem, updateItem, createAssetMenu } from "../reducers"; // Ensure correct import
+import { addGrid, updateItem, createAssetMenu } from "../reducers"; // Ensure correct import
 import "./GameContainer.css";
 
 // Utility function for debouncing
@@ -29,8 +29,7 @@ function GameContainer({ onClose, game = {}, onRename, onDescriptionChange }) {
   const { _id: gameId = null, gameName = "", gameDescription = "" } = game;
 
   const [windowTitle, setWindowTitle] = useState(gameName);
-  const [gameDescriptionState, setGameDescriptionState] =
-    useState(gameDescription);
+  const [gameDescriptionState, setGameDescriptionState] = useState(gameDescription);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -49,19 +48,19 @@ function GameContainer({ onClose, game = {}, onRename, onDescriptionChange }) {
     if (gameId) {
       setIsLoading(true);
       axios
-        .get(`http://localhost:3001/api/assetMenus?gameId=${gameId}`, {
+        .get(`http://localhost:3001/api/grids?gameId=${gameId}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         })
         .then((response) => {
-          const sortedMenus = response.data
-            .map((menu, index) => ({ ...menu, order: menu.order ?? index }))
-            .sort((a, b) => a.order - b.order);
-          dispatch(updateItem({ type: "assetMenus", items: sortedMenus }));
+          dispatch(updateItem({ type: "grids", items: response.data }));
         })
-        .catch((error) => console.error("Error fetching asset menus:", error))
+        .catch((error) => {
+          console.error("Failed to fetch grids.", error);
+          setError("Failed to fetch grids.");
+        })
         .finally(() => setIsLoading(false));
     }
-  }, [gameId, dispatch]);
+  }, [gameId, dispatch]);    
 
   const debouncedUpdateGameName = useDebounce(async (name) => {
     if (name === gameName) return;
@@ -95,45 +94,47 @@ function GameContainer({ onClose, game = {}, onRename, onDescriptionChange }) {
     }
   }, 500);
 
-  const handleAddGrid = () => {
-    const newGrid = {
-      id: `grid-${grids.length + 1}`,
-      rows: 5,
-      columns: 5,
-      cellSize: 100,
-      assets: [],
-    };
-    dispatch(addItem(newGrid));
-  };
-
   const handleDragEndAssetMenu = async (result) => {
     const { destination, source } = result;
+  
     if (!destination || destination.index === source.index) return;
-
+  
+    const previousState = [...assetMenus];
     const reorderedMenus = [...assetMenus];
     const [movedMenu] = reorderedMenus.splice(source.index, 1);
     reorderedMenus.splice(destination.index, 0, movedMenu);
-
+  
     const updatedMenusWithOrder = reorderedMenus.map((menu, index) => ({
-      ...menu,
+      _id: menu._id,
       order: index,
     }));
-
-    dispatch(updateItem({ type: "assetMenus", items: updatedMenusWithOrder }));
-
+  
+    dispatch(updateItem({ type: "assetMenus", items: reorderedMenus }));
+  
+    const token = localStorage.getItem("token");
+    if (!token) {
+      console.error("Authorization token is missing.");
+      return;
+    }
+  
     try {
-      const token = localStorage.getItem("token");
       await axios.put(
-        `http://localhost:3001/api/assetMenus/update-order`, // Replace with your endpoint
-        { orderedData: updatedMenusWithOrder }, // Ensure this matches backend expectations
+        `http://localhost:3001/api/assetMenus/update-order`,
+        { orderedData: updatedMenusWithOrder },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+  
+      const updatedMenus = await axios.get(
+        `http://localhost:3001/api/assetMenus?gameId=${gameId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      dispatch(updateItem({ type: "assetMenus", items: updatedMenus.data }));
     } catch (error) {
       console.error("Error saving asset menu order:", error);
+      dispatch(updateItem({ type: "assetMenus", items: previousState }));
     }
   };
 
-  // When creating a new asset menu
   const handleCreateAssetMenu = async () => {
     const token = localStorage.getItem("token");
     try {
@@ -156,7 +157,7 @@ function GameContainer({ onClose, game = {}, onRename, onDescriptionChange }) {
       const newAssetMenu = response.data.assetMenu;
 
       if (newAssetMenu && newAssetMenu._id) {
-        dispatch(createAssetMenu(newAssetMenu)); // Dispatch to add the new asset menu
+        dispatch(createAssetMenu(newAssetMenu));
       } else {
         console.error("Asset menu creation failed: No _id received.");
       }
@@ -167,89 +168,170 @@ function GameContainer({ onClose, game = {}, onRename, onDescriptionChange }) {
     }
   };
 
-  return (
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const handleEditTitleClick = () => setIsEditingTitle(true);
+  const handleTitleChange = (e) => setWindowTitle(e.target.value);
+  const handleTitleSave = () => {
+    setIsEditingTitle(false);
+    debouncedUpdateGameName(windowTitle);
+  };
+
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const handleEditDescriptionClick = () => setIsEditingDescription(true);
+  const handleDescriptionChange = (e) => setNewDescription(e.target.value);
+  const handleDescriptionSave = () => {
+    setIsEditingDescription(false);
+    debouncedUpdateGameDescription(newDescription);
+  };
+
+  const handleAddGrid = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const newGrid = {
+        gameId, // Ensure this is set correctly
+        rows: 5, // Grid row count
+        columns: 5, // Grid column count
+        cellSize: 100, // Cell size
+      };
+  
+      console.log("Sending grid data to backend:", newGrid);
+  
+      const response = await axios.post(
+        `http://localhost:3001/api/grids`,
+        newGrid,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+  
+      console.log("Received response:", response);
+  
+      // Assuming the response contains the new grid object
+      const createdGrid = response.data.grid;
+  
+      // Update Redux state with the newly created grid
+      if (createdGrid) {
+        dispatch(addGrid(createdGrid)); // Ensure the addGrid action updates the Redux store
+      } else {
+        setError("Failed to create grid. No grid received.");
+      }
+  
+      // Fetch the updated list of grids to ensure the UI is in sync
+      const gridsResponse = await axios.get(
+        `http://localhost:3001/api/grids?gameId=${gameId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      dispatch(updateItem({ type: "grids", items: gridsResponse.data }));
+  
+    } catch (error) {
+      console.error("Error adding grid:", error);
+      setError("Error adding grid.");
+    }
+  };
+
+  const handleDragEndGrid = (result) => {
+    const { destination, source } = result;
+  
+    // If dropped outside the list, do nothing
+    if (!destination) {
+      return;
+    }
+  
+    // If the item has not moved, do nothing
+    if (destination.index === source.index) {
+      return;
+    }
+  
+    // Reorder the grids
+    const updatedGrids = Array.from(grids);
+    const [removed] = updatedGrids.splice(source.index, 1);
+    updatedGrids.splice(destination.index, 0, removed);
+  
+    // Dispatch action to update the grids in the state
+    dispatch(updateItem({ type: "grids", items: updatedGrids }));
+  };  
+    
+    return (
     <div className="game-container">
+      {/* Editable Title */}
       <header>
-        <h1>{windowTitle}</h1>
+        {isEditingTitle ? (
+          <input
+            type="text"
+            value={windowTitle}
+            onChange={handleTitleChange}
+            onBlur={handleTitleSave}
+            autoFocus
+          />
+        ) : (
+          <h1 onClick={handleEditTitleClick}>{windowTitle}</h1>
+        )}
+                <button
+          onClick={() => setIsEditingTitle((prev) => !prev)}
+          aria-label={isEditingTitle ? "Save Description" : "Edit Description"}
+        >
+          {isEditingTitle ? "Save" : "Edit"}
+        </button>
       </header>
 
+      {/* Editable Description */}
       <section className="game-description">
-        {isRenamingDescription ? (
+        {isEditingDescription ? (
           <input
             type="text"
             value={newDescription}
-            onChange={(e) => setNewDescription(e.target.value)}
-            onBlur={() => debouncedUpdateGameDescription(newDescription)}
+            onChange={handleDescriptionChange}
+            onBlur={handleDescriptionSave}
+            autoFocus
           />
         ) : (
-          <p>{gameDescriptionState}</p>
+          <p onClick={handleEditDescriptionClick}>{gameDescriptionState}</p>
         )}
         <button
-          onClick={() => setIsRenamingDescription((prev) => !prev)}
-          aria-label={
-            isRenamingDescription ? "Save Description" : "Edit Description"
-          }
+          onClick={() => setIsEditingDescription((prev) => !prev)}
+          aria-label={isEditingDescription ? "Save Description" : "Edit Description"}
         >
-          {isRenamingDescription ? "Save" : "Edit"}
+          {isEditingDescription ? "Save" : "Edit"}
         </button>
       </section>
 
       <section className="asset-menus">
-        <button onClick={handleCreateAssetMenu} aria-label="Add Asset Menu">
-          Add Asset Menu
-        </button>
-        <DragDropContext onDragEnd={handleDragEndAssetMenu}>
-          <Droppable droppableId="droppable" direction="horizontal">
-            {(provided) => (
-              <div
-                className="asset-menus-list"
-                ref={provided.innerRef}
-                {...provided.droppableProps}
-              >
-                {assetMenus.length > 0 ? (
-                  assetMenus.map((menu, index) => (
-                    <Draggable
-                      key={menu._id}
-                      draggableId={menu._id}
-                      index={index}
-                    >
-                      {(provided) => (
-                        <div
-                          className="asset-menu-item"
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          {...provided.dragHandleProps}
-                        >
-                          <AssetMenu {...menu} />
-                        </div>
-                      )}
-                    </Draggable>
-                  ))
-                ) : (
-                  <p>No asset menus available</p> // Fallback message
+  <button onClick={handleCreateAssetMenu} aria-label="Add Asset Menu">
+    Add Asset Menu
+  </button>
+  <DragDropContext onDragEnd={handleDragEndAssetMenu}>
+    <Droppable droppableId="droppable" direction="horizontal">
+      {(provided) => (
+        <div
+          className="asset-menus-list"
+          ref={provided.innerRef}
+          {...provided.droppableProps}
+        >
+          {assetMenus.length > 0 ? (
+            assetMenus.map((menu, index) => (
+              <Draggable key={menu._id} draggableId={menu._id} index={index}>
+                {(provided) => (
+                  <div
+                    className="asset-menu-item"
+                    ref={provided.innerRef}
+                    {...provided.draggableProps}
+                    {...provided.dragHandleProps}
+                  >
+                    <AssetMenu {...menu} />
+                  </div>
                 )}
-                {provided.placeholder}
-              </div>
-            )}
-          </Droppable>
-        </DragDropContext>
-        <button onClick={handleAddGrid} aria-label="Add Grid">
-          Add Grid
-        </button>
-      </section>
-
-      <section className="snap-grids">
-        {grids.map((grid) => (
-          <SnapGrid
-            key={grid.id}
-            id={grid.id}
-            draggableId={grid.id} // Unique draggableId based on grid.id
-            rows={grid.rows}
-            columns={grid.columns}
-            cellSize={grid.cellSize}
-          />
-        ))}
-      </section>
+              </Draggable>
+            ))
+          ) : (
+            <p>No asset menus available</p>
+          )}
+          {provided.placeholder}
+        </div>
+      )}
+    </Droppable>
+  </DragDropContext>
+  <button onClick={handleAddGrid} aria-label="Add Grid">
+    Add Grid
+  </button>
+</section>
     </div>
   );
 }

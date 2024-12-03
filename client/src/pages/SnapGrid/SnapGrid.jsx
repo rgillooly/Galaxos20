@@ -54,7 +54,7 @@ const SnapGrid = ({ id, children, onDrop, rows, columns, cellSize }) => {
 };
 
 SnapGrid.propTypes = {
-  id: PropTypes.string.isRequired,
+  _id: PropTypes.string,
   children: PropTypes.node,
   rows: PropTypes.number.isRequired,
   columns: PropTypes.number.isRequired,

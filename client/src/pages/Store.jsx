@@ -1,9 +1,5 @@
-import { createStore, combineReducers } from "redux";
-import reducer from "./reducers"; // Import the reducer
-
-const rootReducer = combineReducers({
-  main: reducer, // Ensure 'main' matches the state used in useSelector
-});
+import { createStore } from "redux";
+import rootReducer from "./reducers"; // Your root reducer
 
 const store = createStore(rootReducer);
 
