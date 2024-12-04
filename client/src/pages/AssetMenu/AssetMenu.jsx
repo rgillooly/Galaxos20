@@ -12,8 +12,8 @@ function AssetMenu({
   onDragStart,
   onDragEnd,
   onTitleUpdate,
-  onDrop, // Callback to notify parent about the drop
-  provided, // For react-beautiful-dnd if necessary
+  onDrop,
+  provided,
 }) {
   const [assetMenuPosition, setAssetMenuPosition] = useState(position);
   const [isDragging, setIsDragging] = useState(false);
@@ -21,10 +21,13 @@ function AssetMenu({
   const [currentTitle, setCurrentTitle] = useState(title);
   const dragStart = useRef({ x: 0, y: 0 });
 
-  // Update the local title state if the prop changes
   useEffect(() => {
     setCurrentTitle(title);
   }, [title]);
+
+  useEffect(() => {
+    console.log("AssetMenu position updated:", assetMenuPosition);
+  }, [assetMenuPosition]);
 
   const handleMouseDown = (e) => {
     setIsDragging(true);
@@ -48,7 +51,7 @@ function AssetMenu({
   const handleMouseUp = () => {
     setIsDragging(false);
     if (onDragEnd) onDragEnd();
-    if (onDrop) onDrop(_id, assetMenuPosition); // Notify parent of the drop
+    if (onDrop) onDrop(_id, assetMenuPosition);
     document.removeEventListener("mousemove", handleMouseMove);
     document.removeEventListener("mouseup", handleMouseUp);
   };
@@ -64,23 +67,22 @@ function AssetMenu({
   const handleSaveTitle = async () => {
     if (!currentTitle.trim()) {
       console.error("Title cannot be empty.");
-      setCurrentTitle(title); // Revert to the original title
+      setCurrentTitle(title);
       setIsEditingTitle(false);
       return;
     }
 
-    setIsEditingTitle(false); // Exit editing mode
-    const previousTitle = title; // Save current title for rollback
+    setIsEditingTitle(false);
+    const previousTitle = title;
     const token = localStorage.getItem("token");
 
     if (!token) {
       console.error("Authorization token is missing.");
-      setCurrentTitle(previousTitle); // Rollback to the previous title
+      setCurrentTitle(previousTitle);
       return;
     }
 
     try {
-      // Update the backend
       await axios.put(
         `http://localhost:3001/api/assetMenus/title-update/${_id}`,
         { title: currentTitle },
@@ -88,7 +90,6 @@ function AssetMenu({
       );
 
       if (onTitleUpdate) {
-        // Notify parent about the title update
         onTitleUpdate(_id, currentTitle);
       }
     } catch (error) {
@@ -96,7 +97,7 @@ function AssetMenu({
         "Error updating the title:",
         error.response ? error.response.data : error
       );
-      setCurrentTitle(previousTitle); // Revert on failure
+      setCurrentTitle(previousTitle);
     }
   };
 
@@ -115,8 +116,10 @@ function AssetMenu({
       style={{
         top: `${assetMenuPosition.top}px`,
         left: `${assetMenuPosition.left}px`,
+        position: "absolute",
+        zIndex: 1000,
       }}
-      ref={provided ? provided.innerRef : undefined} // Added innerRef for drag functionality
+      ref={provided ? provided.innerRef : undefined}
       {...provided?.draggableProps}
       {...provided?.dragHandleProps}
     >
@@ -139,7 +142,11 @@ function AssetMenu({
       <div className="asset-menu-content">
         <ul>
           {assets.length > 0 ? (
-            assets.map((asset) => <li key={asset._id}>{asset.name}</li>)
+            assets.map((asset) => (
+              <li key={asset._id} className="asset-item">
+                {asset.name}
+              </li>
+            ))
           ) : (
             <li>No assets available</li>
           )}
@@ -167,7 +174,7 @@ AssetMenu.propTypes = {
   onDragEnd: PropTypes.func,
   onTitleUpdate: PropTypes.func,
   onDrop: PropTypes.func,
-  provided: PropTypes.object, // For drag-and-drop props
+  provided: PropTypes.object,
 };
 
 export default AssetMenu;
