@@ -36,26 +36,22 @@ const Signup = () => {
       position: "bottom-right",
     });
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     try {
       const response = await axios.post(
-        "http://localhost:3001/api/auth/signup", // Correct URL for your signup route
+        "http://localhost:3001/api/auth/signup",
         {
-          username: username,
-          password: password,
-          email: email, // Send email along with username and password
+          username,
+          email,
+          password,
         }
       );
-
-      console.log("User signed up:", response.data);
-      // Handle success (e.g., redirect to login or show success message)
-      handleSuccess("Signup successful!"); // Assuming handleSuccess displays a success message
+      console.log("Signup successful:", response.data);
     } catch (error) {
-      console.error("Error during signup:", error.response?.data);
-      handleError(
-        error.response?.data.message || "Something went wrong during signup."
+      console.error(
+        "Error during signup:",
+        error.response?.data || error.message
       );
     }
   };
