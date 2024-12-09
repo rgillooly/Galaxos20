@@ -1,13 +1,12 @@
 const express = require("express");
 const router = express.Router();
 const AssetMenu = require("../models/AssetMenu");
-const authenticateJWT = require("../middlewares/AuthenticateJWT");
 const mongoose = require("mongoose");
 
 // Route to create a new asset menu for a specific game
 router.post("/", async (req, res) => {
   try {
-    const { title = "", position, assets, gameId, order } = req.body;
+    const { title = "", position, assets, gameId } = req.body;
 
     if (!gameId) {
       return res.status(400).json({
@@ -22,7 +21,6 @@ router.post("/", async (req, res) => {
       position,
       assets,
       gameId,
-      order,
     });
 
     await newAssetMenu.save();
@@ -46,152 +44,29 @@ router.post("/", async (req, res) => {
 router.get("/", async (req, res) => {
   const { gameId } = req.query;
   try {
-    const assetMenus = await AssetMenu.find({ gameId }).sort("order");
+    const assetMenus = await AssetMenu.find({ gameId });
 
-    // If some menus don't have an order, assign them one based on their index
-    const assetMenusWithDefaultOrder = assetMenus.map((menu, index) => ({
-      ...menu.toObject(),
-      order: menu.order || index, // Assign default order if not present
-    }));
-
-    res.json(assetMenusWithDefaultOrder);
+    res.json(assetMenus);
   } catch (error) {
     console.error("Error fetching asset menus:", error);
     res.status(500).json({ message: "Error fetching asset menus", error });
   }
 });
 
-// Route to update order of asset menus in bulk
-router.put("/assetMenus/update-order", authenticateJWT, async (req, res) => {
-  const { orderedData } = req.body;
-
-  console.log(
-    "Ordered Data Received from Client:",
-    JSON.stringify(orderedData, null, 2)
-  );
-
-  if (!Array.isArray(orderedData)) {
-    return res.status(400).json({
-      success: false,
-      message: "orderedData should be an array",
-    });
-  }
-
-  const invalidItems = orderedData.filter(
-    (item) =>
-      !mongoose.Types.ObjectId.isValid(item._id) ||
-      typeof item.order !== "number"
-  );
-
-  if (invalidItems.length > 0) {
-    console.log("Invalid Items in Ordered Data:", invalidItems);
-    return res.status(400).json({
-      success: false,
-      message: "Each item must have a valid '_id' and 'order'",
-      invalidItems,
-    });
-  }
-
+// Endpoint to update position
+router.put("/:id", async (req, res) => {
   try {
-    const bulkOps = orderedData.map(({ _id, order }) => ({
-      updateOne: {
-        filter: { _id: new mongoose.Types.ObjectId(_id) }, // Use 'new' for ObjectId
-        update: { $set: { order } },
-      },
-    }));
-
-    console.log("Bulk Operations Prepared for DB:", bulkOps);
-
-    const result = await AssetMenu.bulkWrite(bulkOps);
-
-    console.log("Bulk Write Result:", result);
-
-    if (result.modifiedCount === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "No orders were updated",
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Asset menu orders updated successfully",
-    });
+    const { top, left } = req.body.position;
+    const updatedMenu = await AssetMenu.findByIdAndUpdate(
+      req.params.id,
+      { $set: { position: { top, left } } }, // Update only the position
+      { new: true } // Return the updated document
+    );
+    res.json(updatedMenu);
   } catch (error) {
-    console.error("Error updating asset menu order:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update order",
-      error,
-    });
+    res.status(500).json({ error: "Failed to update position" });
   }
 });
-
-// Route to update individual asset menu order
-router.put(
-  "/assetMenus/order/bulk-update",
-  authenticateJWT,
-  async (req, res) => {
-    console.log("Bulk Order Update Route triggered");
-    const { orderedData } = req.body;
-
-    if (!Array.isArray(orderedData)) {
-      return res.status(400).json({
-        success: false,
-        message: "orderedData should be an array",
-      });
-    }
-
-    const invalidItems = orderedData.filter(
-      (item) =>
-        !mongoose.Types.ObjectId.isValid(item._id) ||
-        typeof item.order !== "number"
-    );
-
-    if (invalidItems.length > 0) {
-      console.log("Invalid Items in Ordered Data:", invalidItems);
-      return res.status(400).json({
-        success: false,
-        message: "Each item must have a valid '_id' and 'order'",
-        invalidItems,
-      });
-    }
-
-    try {
-      const bulkOps = orderedData.map(({ _id, order }) => ({
-        updateOne: {
-          filter: { _id: mongoose.Types.ObjectId(_id) },
-          update: { $set: { order } },
-        },
-      }));
-
-      console.log("Bulk Operations Prepared for DB:", bulkOps);
-
-      const result = await AssetMenu.bulkWrite(bulkOps);
-
-      console.log("Bulk Write Result:", result);
-
-      if (result.modifiedCount === 0) {
-        return res.status(400).json({
-          success: false,
-          message: "No orders were updated",
-        });
-      }
-
-      res.status(200).json({
-        success: true,
-        message: "Asset menu orders updated successfully",
-      });
-    } catch (error) {
-      console.error("Error updating asset menu order:", error);
-      res.status(500).json({
-        success: false,
-        message: "Failed to update order",
-        error,
-      });
-    }
-  }
-);
 
 // Title update route should be placed after to avoid route conflicts
 router.put("/title-update/:id", async (req, res) => {

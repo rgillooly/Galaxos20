@@ -65,6 +65,8 @@ app.use("/api/games/:gameId/assetMenus", authenticateJWT, assetMenuRoutes);
 // General asset menu routes (for all asset menus not tied to a specific game)
 app.use("/api/assetMenus", authenticateJWT, assetMenuRoutes);
 
+app.use("/api", assetMenuRoutes); // Prefix the routes with /api
+
 // Include grid routes
 app.use("/api/grids", authenticateJWT, gridRoutes); // Ensure the grid routes are correctly defined
 
@@ -74,14 +76,18 @@ app.get("/api/users", async (req, res) => {
     const users = await User.find(); // Fetch all users from the database
     res.json(users); // Return the users as JSON
   } catch (err) {
-    res.status(500).json({ message: "Error fetching users", error: err.message });
+    res
+      .status(500)
+      .json({ message: "Error fetching users", error: err.message });
   }
 });
 
 // Default error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ message: "Internal server error", error: err.message });
+  res
+    .status(500)
+    .json({ message: "Internal server error", error: err.message });
 });
 
 // Start server

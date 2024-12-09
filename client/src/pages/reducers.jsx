@@ -1,19 +1,18 @@
-// Initial state for the reducer
+import {
+  ADD_ITEM,
+  UPDATE_ITEM,
+  ADD_GRID,
+  CREATE_ASSET_MENU,
+} from "./actionTypes";
+
 const initialState = {
   main: {
-    assetMenus: [],
+    assetMenus: [], // Default value to ensure this always exists
     grids: [],
   },
 };
 
-// Action Types
-export const ADD_ITEM = "ADD_ITEM";
-export const UPDATE_ITEM = "UPDATE_ITEM";
-export const ADD_GRID = "ADD_GRID";
-export const CREATE_ASSET_MENU = "CREATE_ASSET_MENU";
-
-// Reducer Function
-// Reducer Function
+// Reducer function
 export default function reducers(state = initialState, action) {
   switch (action.type) {
     case ADD_ITEM:
@@ -22,46 +21,39 @@ export default function reducers(state = initialState, action) {
         return state;
       }
 
-      // Handling dynamic action types based on payload type
       switch (action.payload.type) {
-        case 'grid':
+        case "grid":
           return {
             ...state,
-            grids: [...state.grids, action.payload],
+            main: {
+              ...state.main,
+              grids: [...state.main.grids, action.payload.item], // Adds new grid
+            },
           };
-        case 'assetMenu':
+        case "assetMenu":
           return {
             ...state,
-            assetMenus: [...state.assetMenus, action.payload],
+            main: {
+              ...state.main,
+              assetMenus: [...state.main.assetMenus, action.payload.item], // Adds new asset menu
+            },
           };
         default:
           console.error("Unknown item type in ADD_ITEM", action.payload.type);
           return state;
       }
 
-    case CREATE_ASSET_MENU:
-      if (!action.payload) {
-        console.error("Invalid CREATE_ASSET_MENU action payload", action.payload);
-        return state;
+    case UPDATE_ITEM:
+      if (action.payload.type === "assetMenus") {
+        return {
+          ...state,
+          main: {
+            ...state.main,
+            assetMenus: action.payload.items, // Updates assetMenus
+          },
+        };
       }
-      return {
-        ...state,
-        assetMenus: [...state.assetMenus, action.payload],
-      };
-
-      case UPDATE_ITEM:
-        if (!action.payload || !Array.isArray(action.payload.items)) {
-          console.error("Invalid UPDATE_ITEM action payload", action.payload);
-          return state; // Return state without changes if payload is invalid
-        }
-      
-        if (action.payload.type === "assetMenus") {
-          return {
-            ...state,
-            assetMenus: action.payload.items, // Update assetMenus in state with new items
-          };
-        }
-        return state;      
+      return state;
 
     case ADD_GRID:
       if (!action.payload) {
@@ -70,7 +62,29 @@ export default function reducers(state = initialState, action) {
       }
       return {
         ...state,
-        grids: [...state.grids, action.payload],
+        main: {
+          ...state.main,
+          grids: [...state.main.grids, action.payload], // Adds new grid
+        },
+      };
+
+    case CREATE_ASSET_MENU:
+      return {
+        ...state,
+        main: {
+          ...state.main,
+          assetMenus: [...state.main.assetMenus, action.payload], // Adds new asset menu
+        },
+      };
+
+    // You can combine SET_ASSET_DATA with one case
+    case "SET_ASSET_DATA":
+      return {
+        ...state,
+        main: {
+          ...state.main,
+          assetMenus: action.payload, // Store fetched asset data
+        },
       };
 
     default:
@@ -79,10 +93,17 @@ export default function reducers(state = initialState, action) {
 }
 
 // Action Creators
+export const addGrid = (grid) => ({
+  type: ADD_GRID,
+  payload: grid,
+});
 
 export const createAssetMenu = (assetMenu) => ({
-  type: CREATE_ASSET_MENU,
-  payload: assetMenu,
+  type: ADD_ITEM, // Same as ADD_ITEM but only for assetMenus
+  payload: {
+    type: "assetMenu",
+    item: assetMenu, // Corrected to 'item'
+  },
 });
 
 export const addItem = (item) => ({
@@ -90,12 +111,7 @@ export const addItem = (item) => ({
   payload: item,
 });
 
-export const updateItem = (items) => ({
+export const updateItem = ({ type, items }) => ({
   type: UPDATE_ITEM,
-  payload: items,
-});
-
-export const addGrid = (grid) => ({
-  type: ADD_GRID,
-  payload: grid,
+  payload: { type, items },
 });
