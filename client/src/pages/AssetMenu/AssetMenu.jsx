@@ -7,7 +7,7 @@ function AssetMenu({
   _id,
   title,
   position,
-  assets, // This is an array of asset IDs, not the actual asset objects
+  assets, // These are the asset IDs
   onDrop,
   onTitleUpdate,
   onAssetsUpdate,
@@ -23,6 +23,7 @@ function AssetMenu({
   const [uploadError, setUploadError] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isMinimized, setIsMinimized] = useState(false); // Track whether the menu is minimized
 
   // Function to retrieve the authentication token from localStorage
   const getAuthToken = () => localStorage.getItem("token");
@@ -128,6 +129,19 @@ function AssetMenu({
     }
   };
 
+  const handleDragStart = (e, asset) => {
+    e.dataTransfer.setData("asset", JSON.stringify(asset)); // Store asset data to be dropped
+  };
+
+  const handleAssetDrop = (e) => {
+    e.preventDefault();
+    const asset = JSON.parse(e.dataTransfer.getData("asset"));
+    // Assuming you pass on the asset to the parent component (e.g., GameContainer)
+    if (onDrop) {
+      onDrop(asset); // Asset should be dropped to the grid
+    }
+  };
+
   const handleDrop = async (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -138,9 +152,10 @@ function AssetMenu({
     setUploading(true);
     setUploadError(null);
 
-    const file = files[0];
     const formData = new FormData();
-    formData.append("file", file);
+    Array.from(files).forEach((file) => {
+      formData.append("files[]", file); // Append each file
+    });
     formData.append("assetMenuId", _id);
 
     try {
@@ -156,8 +171,12 @@ function AssetMenu({
       );
 
       if (response.data.success) {
-        const uploadedAsset = response.data.asset; // Assuming backend returns the uploaded asset
-        setAssetsState((prevAssets) => [...prevAssets, uploadedAsset]);
+        const uploadedAssets = response.data.assets; // Assuming the backend returns multiple assets
+        setAssetsState((prevAssets) => [...prevAssets, ...uploadedAssets]);
+
+        if (onAssetsUpdate) {
+          onAssetsUpdate(uploadedAssets);
+        }
       } else {
         setUploadError("Upload failed. Please try again.");
       }
@@ -167,6 +186,11 @@ function AssetMenu({
     } finally {
       setUploading(false);
     }
+  };
+
+  // Toggle minimized state
+  const toggleMinimize = () => {
+    setIsMinimized((prev) => !prev);
   };
 
   return (
@@ -192,46 +216,54 @@ function AssetMenu({
             className="edit-input"
           />
         ) : (
-          <h3 onClick={handleEditTitle}>{currentTitle}</h3>
+          <h3 onClick={toggleMinimize} style={{ cursor: "pointer" }}>
+            {currentTitle}
+          </h3>
         )}
         <button onClick={() => onClose && onClose(_id)}>Close</button>
       </header>
-      {uploading && <p>Uploading...</p>}
-      {uploadError && <p className="error-message">{uploadError}</p>}
-      <div
-        className="drop-zone"
-        onDrop={handleDrop}
-        onDragOver={(e) => e.preventDefault()}
-        onDragEnter={(e) => e.preventDefault()}
-      >
-        <p>Drag and drop a file here to add it to the menu.</p>
-      </div>
-      <div className="asset-menu-content">
-        {loading ? (
-          <p>Loading assets...</p>
-        ) : error ? (
-          <p className="error-message">{error}</p>
-        ) : assetsState.length > 0 ? (
-          <ul>
-            {assetsState.map((asset) => (
-              <li key={asset._id}>
-                {asset.type && asset.type.startsWith("image") ? (
-                  <img
-                    src={`http://localhost:3001/${asset.filePath}`}
-                    alt={asset.name}
-                    className="asset-thumbnail"
-                  />
-                ) : (
-                  <div className="file-icon">{asset.type}</div>
-                )}
-                <div>{asset.name}</div>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>No assets available</p>
-        )}
-      </div>
+
+      {/* Display content only if not minimized */}
+      {!isMinimized && (
+        <>
+          {uploading && <p>Uploading...</p>}
+          {uploadError && <p className="error-message">{uploadError}</p>}
+          <div
+            className="drop-zone"
+            onDrop={handleDrop}
+            onDragOver={(e) => e.preventDefault()}
+            onDragEnter={(e) => e.preventDefault()}
+          >
+            <p>Drag and drop a file here to add it to the menu.</p>
+          </div>
+          <div className="asset-menu-content">
+            {loading ? (
+              <p>Loading assets...</p>
+            ) : error ? (
+              <p className="error-message">{error}</p>
+            ) : assetsState.length > 0 ? (
+              <ul>
+                {assetsState.map((asset) => (
+                  <li key={asset._id}>
+                    {asset.type && asset.type.startsWith("image") ? (
+                      <img
+                        src={`http://localhost:3001/${asset.filePath}`}
+                        alt={asset.name}
+                        className="asset-thumbnail"
+                      />
+                    ) : (
+                      <div className="file-icon">{asset.type}</div>
+                    )}
+                    <div>{asset.name}</div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>No assets available</p>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

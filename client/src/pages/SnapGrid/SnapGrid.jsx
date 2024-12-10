@@ -36,8 +36,7 @@ const SnapGrid = ({ id, children, onDrop, rows, columns, cellSize }) => {
       {(provided) => (
         <div
           className="snap-grid"
-          ref={provided.innerRef}
-          {...provided.droppableProps}
+          {...provided.droppableProps} // No need to add ref directly here
           style={{
             gridTemplateColumns: `repeat(${columns}, ${cellSize}px)`,
             gridTemplateRows: `repeat(${rows}, ${cellSize}px)`,
