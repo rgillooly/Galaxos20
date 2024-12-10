@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import "./PanContainer.css"; // Separate CSS for styles (optional)
 
 function PanContainer({ children }) {
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -37,24 +38,16 @@ function PanContainer({ children }) {
 
   return (
     <div
-      style={{
-        position: "relative",
-        overflow: "hidden",
-        width: "100%",
-        height: "100%",
-        cursor: isPanning ? "grabbing" : "default",
-      }}
+      className="pan-container"
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onContextMenu={(e) => e.preventDefault()} // Disable context menu
     >
       <div
+        className="pan-content"
         style={{
           transform: `translate(${offset.x}px, ${offset.y}px)`,
-          position: "absolute",
-          top: 0,
-          left: 0,
         }}
       >
         {/* Pass down drag handlers to children */}

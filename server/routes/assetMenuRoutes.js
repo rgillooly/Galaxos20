@@ -8,10 +8,11 @@ router.post("/", async (req, res) => {
   try {
     const { title = "", position, assets, gameId } = req.body;
 
-    if (!gameId) {
+    // Validate gameId
+    if (!gameId || !mongoose.Types.ObjectId.isValid(gameId)) {
       return res.status(400).json({
         success: false,
-        message: "gameId is required",
+        message: "Valid gameId is required",
       });
     }
 
@@ -40,31 +41,79 @@ router.post("/", async (req, res) => {
   }
 });
 
-// Backend database fetch for asset menus (in the relevant route)
+// Fetch asset menus based on gameId
 router.get("/", async (req, res) => {
   const { gameId } = req.query;
   try {
+    // Validate gameId format
+    if (!gameId || !mongoose.Types.ObjectId.isValid(gameId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid gameId is required",
+      });
+    }
+
     const assetMenus = await AssetMenu.find({ gameId });
 
-    res.json(assetMenus);
+    res.json({
+      success: true,
+      assetMenus,
+    });
   } catch (error) {
     console.error("Error fetching asset menus:", error);
-    res.status(500).json({ message: "Error fetching asset menus", error });
+    res
+      .status(500)
+      .json({ success: false, message: "Error fetching asset menus", error });
   }
 });
 
-// Endpoint to update position
+// Fetch an AssetMenu by ID (for update or to display details)
+router.get("/:id", async (req, res) => {
+  try {
+    const assetMenu = await AssetMenu.findById(req.params.id);
+    if (!assetMenu) {
+      return res.status(404).json({ message: "AssetMenu not found" });
+    }
+
+    res.json({ assetMenu });
+  } catch (err) {
+    console.error("Error fetching AssetMenu:", err);
+    res
+      .status(500)
+      .json({ message: "Error fetching AssetMenu", error: err.message });
+  }
+});
+
+// Endpoint to update position of an AssetMenu
 router.put("/:id", async (req, res) => {
   try {
     const { top, left } = req.body.position;
+
+    if (top === undefined || left === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "Position with 'top' and 'left' values is required",
+      });
+    }
+
     const updatedMenu = await AssetMenu.findByIdAndUpdate(
       req.params.id,
       { $set: { position: { top, left } } }, // Update only the position
       { new: true } // Return the updated document
     );
-    res.json(updatedMenu);
+    if (!updatedMenu) {
+      return res.status(404).json({ message: "AssetMenu not found" });
+    }
+
+    res.json({
+      success: true,
+      message: "AssetMenu position updated",
+      assetMenu: updatedMenu,
+    });
   } catch (error) {
-    res.status(500).json({ error: "Failed to update position" });
+    res
+      .status(500)
+      .json({ success: false, error: "Failed to update position" });
   }
 });
 

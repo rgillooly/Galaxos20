@@ -8,19 +8,26 @@ const authenticateJWT = require("./middlewares/AuthenticateJWT"); // JWT auth mi
 const authRoutes = require("./routes/authRoutes"); // Correct import for auth routes
 const assetMenuRoutes = require("./routes/assetMenuRoutes");
 const gridRoutes = require("./routes/gridRoutes"); // Ensure you're importing the correct routes file
+const assetRoutes = require("./routes/assetRoutes");
 const multer = require("multer");
 const path = require("path");
-const fs = require("fs");
+const fs = require("fs").promises; // Use promises for async handling
 
 const { MONGO_URL, PORT } = process.env;
 
 // Set up file storage with Multer
+const createUploadDir = async (uploadDir) => {
+  try {
+    await fs.mkdir(uploadDir, { recursive: true });
+  } catch (err) {
+    console.error("Error creating upload directory:", err);
+  }
+};
+
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination: async (req, file, cb) => {
     const uploadDir = path.join(__dirname, "uploads", "assets");
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
+    await createUploadDir(uploadDir); // Ensure the directory exists
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {
@@ -28,6 +35,7 @@ const storage = multer.diskStorage({
   },
 });
 
+// Connect to MongoDB
 mongoose
   .connect(MONGO_URL, {
     useNewUrlParser: true,
@@ -46,6 +54,8 @@ const app = express();
 const corsOptions = {
   origin: "http://localhost:5173", // Your frontend URL
   credentials: true, // Allow credentials (like cookies) if needed
+  methods: "GET,POST,PUT,DELETE",
+  allowedHeaders: "Content-Type,Authorization",
 };
 app.use(cors(corsOptions)); // Apply the correct CORS options
 
@@ -62,13 +72,16 @@ app.use("/api/games", authenticateJWT, gameRoutes); // Game routes are now prote
 // Only this route should be used for asset menus associated with a specific game
 app.use("/api/games/:gameId/assetMenus", authenticateJWT, assetMenuRoutes);
 
-// General asset menu routes (for all asset menus not tied to a specific game)
+// General asset menus (not tied to any specific game)
 app.use("/api/assetMenus", authenticateJWT, assetMenuRoutes);
 
-app.use("/api", assetMenuRoutes); // Prefix the routes with /api
+// Asset-related routes
+app.use("/api/assets", authenticateJWT, assetRoutes); // Asset routes should be prefixed correctly
 
 // Include grid routes
 app.use("/api/grids", authenticateJWT, gridRoutes); // Ensure the grid routes are correctly defined
+
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // User fetch route (Example)
 app.get("/api/users", async (req, res) => {

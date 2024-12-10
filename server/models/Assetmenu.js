@@ -28,13 +28,7 @@ const AssetMenuSchema = new mongoose.Schema(
       type: PositionSchema,
       required: true, // Ensure position is always provided
     },
-    assets: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Asset", // Assuming assets are references to the Asset model
-        default: [], // Default empty array if no assets are provided
-      },
-    ],
+    assets: [{ type: mongoose.Schema.Types.ObjectId, ref: "Asset" }],
   },
   { timestamps: true } // Optionally, add timestamps for createdAt and updatedAt
 );
