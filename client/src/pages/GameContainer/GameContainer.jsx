@@ -50,9 +50,9 @@ const GameContainer = ({ game = {}, onRename, onDescriptionChange }) => {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         })
         .then((response) => {
-          console.log("Grid API Response:", response.data); // Inspect the response
-          if (response.data && response.data.grid) {
-            setGrid(response.data.grid);
+          console.log("Grid API Response:", response.data); // Log the full response
+          if (response.data && response.data.grids) {
+            setGrid(response.data.grids[0]); // Assuming you need the first grid
           } else {
             console.error("Invalid grid response format:", response.data);
           }
@@ -62,7 +62,7 @@ const GameContainer = ({ game = {}, onRename, onDescriptionChange }) => {
           alert("Failed to fetch grid. Please try again.");
         });
     }
-  }, [gameId]);  
+  }, [gameId]);
 
   const debouncedUpdateGameName = async (name) => {
     if (name === gameName) return;
@@ -156,14 +156,14 @@ const GameContainer = ({ game = {}, onRename, onDescriptionChange }) => {
   const handleAssetDrop = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-  
+
     const files = e.dataTransfer.files;
     console.log("Files to upload:", files);
-  
+
     const formData = new FormData();
     Array.from(files).forEach((file) => formData.append("files", file)); // Updated field name to 'files'
     formData.append("assetMenuId", assetMenuId); // Ensure this matches server-side expectations
-  
+
     try {
       const response = await axios.post(
         "http://localhost:3001/api/assets/upload",
@@ -179,7 +179,7 @@ const GameContainer = ({ game = {}, onRename, onDescriptionChange }) => {
     } catch (error) {
       console.error("Error uploading asset:", error);
     }
-  };  
+  };
 
   const createNewGrid = async () => {
     try {
@@ -219,32 +219,35 @@ const GameContainer = ({ game = {}, onRename, onDescriptionChange }) => {
       <button onClick={createNewGrid}>Create New Grid</button>
 
       <PanContainer>
-        <div className="grid-container">
-          {grid.rows && grid.columns && grid.cellSize && (
-            <SnapGrid
-              id={grid._id || "snap-grid-1"} // ID for the grid
-              rows={grid.rows} // Grid rows
-              columns={grid.columns} // Grid columns
-              cellSize={grid.cellSize} // Cell size in pixels
-              onDrop={handleDrop}
+        <div style={{ width: "800px", height: "600px", position: "relative" }}>
+          <SnapGrid
+            id="grid-1"
+            rows={10}
+            columns={10}
+            cellSize={50}
+            onDrop={handleDrop}
+          >
+            <div
+              style={{
+                width: "40px",
+                height: "40px",
+                backgroundColor: "blue",
+              }}
             >
-              {/* Here you can render assets as children */}
-              {assetsState.map((asset) => (
-                <Asset key={asset._id} asset={asset} />
-              ))}
-            </SnapGrid>
-          )}
+              Draggable Item
+            </div>
+          </SnapGrid>
         </div>
         <div className="asset-menus-container">
           {assetMenus.map((menu) => (
             <AssetMenu
-            key={menu._id}
-            _id={menu._id}
-            title={menu.title}
-            position={menu.position}
-            assets={menu.assets}
-            onDrop={(e) => handleAssetDrop(e, menu._id)} // Pass menu ID
-          />          
+              key={menu._id}
+              _id={menu._id}
+              title={menu.title}
+              position={menu.position}
+              assets={menu.assets}
+              onDrop={(e) => handleAssetDrop(e, menu._id)} // Pass menu ID
+            />
           ))}
         </div>
       </PanContainer>

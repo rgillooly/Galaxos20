@@ -17,3 +17,27 @@
 .snap-grid > div:hover {
   background-color: #bbb; /* Slightly darker grey on hover */
 }
+
+.snap-grid-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: visible; /* Allow grid to go beyond parent bounds */
+}
+
+.lock-toggle-btn {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1000;
+  padding: 5px 10px;
+  background-color: #000000;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.lock-toggle-btn:hover {
+  background-color: #0056b3;
+}

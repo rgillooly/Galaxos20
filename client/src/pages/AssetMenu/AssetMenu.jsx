@@ -24,6 +24,7 @@ function AssetMenu({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isMinimized, setIsMinimized] = useState(false); // Track whether the menu is minimized
+  const [isLocked, setIsLocked] = useState(false); // Lock state to prevent dragging
 
   // Function to retrieve the authentication token from localStorage
   const getAuthToken = () => localStorage.getItem("token");
@@ -56,13 +57,15 @@ function AssetMenu({
   }, [_id]); // Fetch assets whenever the `_id` (menu ID) changes
 
   const handleMouseDown = (e) => {
+    if (isLocked) return; // Prevent dragging if locked
+
     e.preventDefault();
     setIsDragging(true);
     setDragStartPos({ x: e.clientX, y: e.clientY });
   };
 
   const handleMouseMove = (e) => {
-    if (!isDragging) return;
+    if (!isDragging || isLocked) return; // Prevent moving if locked
 
     const deltaX = e.clientX - dragStartPos.x;
     const deltaY = e.clientY - dragStartPos.y;
@@ -193,6 +196,11 @@ function AssetMenu({
     setIsMinimized((prev) => !prev);
   };
 
+  // Toggle lock state
+  const toggleLock = () => {
+    setIsLocked((prev) => !prev);
+  };
+
   return (
     <div
       className="asset-menu"
@@ -200,37 +208,48 @@ function AssetMenu({
         position: "absolute",
         top: `${menuPosition.top}px`,
         left: `${menuPosition.left}px`,
+        width: 200, // Fixed width
+        height: 150, // Fixed height
+        cursor: isLocked ? "default" : "move", // Cursor change when locked
+        border: "1px solid #ccc",
+        backgroundColor: "white",
+        padding: "10px",
+        boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
       }}
       onMouseDown={handleMouseDown}
       onDragOver={(e) => e.preventDefault()}
       onDrop={handleDrop}
     >
-<header className="asset-menu-header">
-  {isEditingTitle ? (
-    <input
-      type="text"
-      value={currentTitle}
-      onChange={handleTitleChange}
-      onBlur={handleSaveTitle}
-      autoFocus
-      className="edit-input"
-    />
-  ) : (
-    <h3 onClick={toggleMinimize} style={{ cursor: "pointer" }}>
-      {currentTitle}
-    </h3>
-  )}
-  <div className="header-actions">
-    {/* Rename Button */}
-    {!isEditingTitle && (
-      <button onClick={handleEditTitle} className="rename-button">
-        Rename
-      </button>
-    )}
-    {/* Close Button */}
-    <button onClick={() => onClose && onClose(_id)}>Close</button>
-  </div>
-</header>
+      <header className="asset-menu-header">
+        {isEditingTitle ? (
+          <input
+            type="text"
+            value={currentTitle}
+            onChange={handleTitleChange}
+            onBlur={handleSaveTitle}
+            autoFocus
+            className="edit-input"
+          />
+        ) : (
+          <h3 onClick={toggleMinimize} style={{ cursor: "pointer" }}>
+            {currentTitle}
+          </h3>
+        )}
+        <div className="header-actions">
+          {/* Rename Button */}
+          {!isEditingTitle && (
+            <button onClick={handleEditTitle} className="rename-button">
+              Rename
+            </button>
+          )}
+          {/* Lock Button */}
+          <button onClick={toggleLock} className="lock-button">
+            {isLocked ? "Unlock" : "Lock"}
+          </button>
+          {/* Close Button */}
+          <button onClick={() => onClose && onClose(_id)}>Close</button>
+        </div>
+      </header>
 
       {/* Display content only if not minimized */}
       {!isMinimized && (
@@ -286,8 +305,8 @@ AssetMenu.propTypes = {
   }).isRequired,
   assets: PropTypes.array.isRequired, // These are the asset IDs
   onDrop: PropTypes.func.isRequired,
-  onTitleUpdate: PropTypes.func.isRequired,
-  onAssetsUpdate: PropTypes.func.isRequired,
+  onTitleUpdate: PropTypes.func,
+  onAssetsUpdate: PropTypes.func,
   onClose: PropTypes.func,
 };
 
