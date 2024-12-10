@@ -31,10 +31,6 @@ const GameList = () => {
   const [error, setError] = useState("");
   const [gameLoading, setLoading] = useState(false);
 
-  const handleChildUpdate = (newData) => {
-    setParentData(newData);
-  };
-
   // Fetch user games on component mount
   useEffect(() => {
     const fetchUserGames = async () => {
@@ -93,22 +89,25 @@ const GameList = () => {
 
   const debouncedUpdateGameDescription = debounce(
     async (gameId, newDescription) => {
-      if (newDescription === selectedGame.gameDescription) return; // Don't update if there's no change
+      if (newDescription === selectedGame?.gameDescription) return; // Don't update if there's no change
       return updateGameDescriptionInDB(gameId, newDescription);
     },
     500
-  ); // Adjust delay (500ms) as per your requirement
+  );
 
-  // GameList.jsx
-  const handleDescriptionChange = async (newDescription) => {
-    if (typeof newDescription === "string") {
-      // Update selectedGame description immediately for instant UI update
+  const handleDescriptionChange = async (e) => {
+    const newDescription = e.target.value;
+
+    // Update state
+    setGameDescription(newDescription);
+
+    // If editing a selected game, update the game's description
+    if (selectedGame) {
       setSelectedGame((prev) => ({
         ...prev,
         gameDescription: newDescription,
       }));
 
-      // Update games array to keep state in sync
       setGames((prevGames) =>
         prevGames.map((game) =>
           game._id === selectedGame._id
@@ -119,27 +118,7 @@ const GameList = () => {
 
       // Use debounced function to update the backend asynchronously
       await debouncedUpdateGameDescription(selectedGame._id, newDescription);
-    } else {
-      console.error("Invalid description:", newDescription);
     }
-  };
-
-  const handleRename = (gameId, newName) => {
-    // Update selectedGame name immediately for instant UI update
-    setSelectedGame((prev) => ({
-      ...prev,
-      gameName: newName,
-    }));
-
-    // Update games array to keep state in sync
-    setGames((prevGames) =>
-      prevGames.map((game) =>
-        game._id === gameId ? { ...game, gameName: newName } : game
-      )
-    );
-
-    // Call backend to update game name (if needed, similar to description)
-    // debouncedUpdateGameName(gameId, newName);
   };
 
   const handleSubmit = async (event) => {
@@ -205,8 +184,8 @@ const GameList = () => {
           <label>Description:</label>
           <input
             type="text"
-            value={gameDescription} // Controlled input for description
-            onChange={handleDescriptionChange} // Correct event handler
+            value={gameDescription}
+            onChange={handleDescriptionChange}
             required
             disabled={gameLoading}
           />
@@ -245,8 +224,9 @@ const GameList = () => {
             onRename={(newName) => handleRename(selectedGame._id, newName)}
             onClose={() => setSelectedGame(null)}
             description={selectedGame.gameDescription}
-            onDescriptionChange={(newDesc) => handleDescriptionChange(newDesc)}
-            onChildUpdate={handleChildUpdate}
+            onDescriptionChange={(newDesc) =>
+              handleDescriptionChange({ target: { value: newDesc } })
+            }
           />
         </MovableWindow>
       )}

@@ -1,27 +1,19 @@
-/* GameContainer.css */
-.grid-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, 100px); /* Adjust cell size */
-  grid-template-rows: repeat(auto-fill, 100px); /* Adjust cell size */
-  gap: 10px; /* Spacing between grid cells */
-  position: relative;
-  width: 100%; /* Adjust based on your container */
-  height: 100%; /* Adjust based on your container */
-}
-
-.grid-item {
-  width: 100px; /* Match grid cell size */
-  height: 100px; /* Match grid cell size */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-/* SnapGrid.css */
 .snap-grid {
   display: grid;
-  border: 1px solid #ccc;
-  background-color: #f0f0f0;
-  position: relative;
+  gap: 1px; /* Space between cells */
+  background-color: #f0f0f0; /* Light grey background */
+  border: 2px solid #000; /* Black border around the whole grid */
+  position: relative; /* Ensure the grid container handles positioning */
+}
+
+.snap-grid > div {
+  background-color: #dcdcdc; /* Grey cells */
+  border: 1px solid black; /* Black lines separating cells */
+  box-sizing: border-box; /* Ensures that padding and borders don't affect size */
+  transition: background-color 0.2s ease; /* Optional: smooth transition for cell hover effect */
+}
+
+/* Optional: Highlight the cells on hover for visual effect */
+.snap-grid > div:hover {
+  background-color: #bbb; /* Slightly darker grey on hover */
 }

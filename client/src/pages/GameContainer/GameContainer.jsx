@@ -1,68 +1,70 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import axios from "axios";
-import AssetMenu from "../AssetMenu/AssetMenu";
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { useDispatch, useSelector } from "react-redux";
-import { addGrid, updateItem, createAssetMenu } from "../reducers"; // Ensure correct import
+import { createAssetMenu, updateItem } from "../reducers";
+import PanContainer from "../PanContainer";
+import GameTitleEditor from "../GameTitleEditor/GameTitleEditor";
+import GameDescriptionEditor from "../GameDescriptionEditor/GameDescriptionEditor";
+import AssetMenu from "../AssetMenu/AssetMenu";
+import Asset from "../Asset/Asset"; // Assuming the Asset component is here
+import SnapGrid from "../SnapGrid/SnapGrid"; // Import the SnapGrid component
 import "./GameContainer.css";
 
-// Utility function for debouncing
-const useDebounce = (func, delay) => {
-  const timer = useRef(null);
-  return (...args) =>
-    new Promise((resolve, reject) => {
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(async () => {
-        try {
-          const result = await func(...args);
-          resolve(result);
-        } catch (err) {
-          reject(err);
-        }
-      }, delay);
-    });
-};
-
-function GameContainer({ onClose, game = {}, onRename, onDescriptionChange }) {
+const GameContainer = ({ game = {}, onRename, onDescriptionChange }) => {
   const { _id: gameId = null, gameName = "", gameDescription = "" } = game;
-
   const [windowTitle, setWindowTitle] = useState(gameName);
-  const [gameDescriptionState, setGameDescriptionState] = useState(gameDescription);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-
-  const [isRenamingName, setIsRenamingName] = useState(false);
-  const [isRenamingDescription, setIsRenamingDescription] = useState(false);
-
-  const [newName, setNewName] = useState(gameName);
-  const [newDescription, setNewDescription] = useState(gameDescription);
-
-  // Redux state and dispatch
-  const assetMenus = useSelector((state) => state.main.assetMenus); // Correct field name
-  const grids = useSelector((state) => state.main.grids);
+  const [gameDescriptionState, setGameDescriptionState] =
+    useState(gameDescription);
+  const [assetMenus, setAssetMenus] = useState([]);
+  const [assetsState, setAssetsState] = useState([]); // Storing the assets
+  const [grid, setGrid] = useState({}); // Grid state for the game
   const dispatch = useDispatch();
 
+  // Fetch asset menus for the game
   useEffect(() => {
     if (gameId) {
-      setIsLoading(true);
       axios
         .get(`http://localhost:3001/api/assetMenus?gameId=${gameId}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         })
         .then((response) => {
-          console.log("Fetched asset menus:", response.data); // Check the fetched data
-          dispatch(updateItem({ type: "assetMenus", items: response.data }));
+          if (response.data && Array.isArray(response.data.assetMenus)) {
+            setAssetMenus(response.data.assetMenus);
+          } else {
+            console.error("Invalid response format:", response.data);
+          }
         })
         .catch((error) => {
-          console.error("Failed to fetch asset menus.", error);
-          setError("Failed to fetch asset menus.");
-        })
-        .finally(() => setIsLoading(false));
+          console.error("Failed to fetch asset menus:", error);
+          alert("Failed to fetch asset menus. Please try again.");
+        });
     }
-  }, [gameId, dispatch]);
+  }, [gameId]);
 
-  const debouncedUpdateGameName = useDebounce(async (name) => {
+  // Fetch grid information for the game
+  useEffect(() => {
+    if (gameId) {
+      axios
+        .get(`http://localhost:3001/api/grids?gameId=${gameId}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        })
+        .then((response) => {
+          console.log("Grid API Response:", response.data); // Inspect the response
+          if (response.data && response.data.grid) {
+            setGrid(response.data.grid);
+          } else {
+            console.error("Invalid grid response format:", response.data);
+          }
+        })
+        .catch((error) => {
+          console.error("Failed to fetch grid:", error);
+          alert("Failed to fetch grid. Please try again.");
+        });
+    }
+  }, [gameId]);  
+
+  const debouncedUpdateGameName = async (name) => {
     if (name === gameName) return;
     try {
       const token = localStorage.getItem("token");
@@ -74,11 +76,12 @@ function GameContainer({ onClose, game = {}, onRename, onDescriptionChange }) {
       setWindowTitle(name);
       onRename(name);
     } catch (error) {
-      setError("Failed to update game name.");
+      console.error("Failed to update game name.");
+      alert("Failed to update game name. Please try again.");
     }
-  }, 500);
+  };
 
-  const debouncedUpdateGameDescription = useDebounce(async (description) => {
+  const debouncedUpdateGameDescription = async (description) => {
     if (description === gameDescriptionState) return;
     try {
       const token = localStorage.getItem("token");
@@ -90,233 +93,169 @@ function GameContainer({ onClose, game = {}, onRename, onDescriptionChange }) {
       setGameDescriptionState(description);
       onDescriptionChange(description);
     } catch (error) {
-      setError("Failed to update game description.");
-    }
-  }, 500);
-
-  const handleDragEndAssetMenu = async (result) => {
-    const { destination, source } = result;
-  
-    if (!destination || destination.index === source.index) return;
-  
-    const previousState = [...assetMenus];
-    const reorderedMenus = [...assetMenus];
-    const [movedMenu] = reorderedMenus.splice(source.index, 1);
-    reorderedMenus.splice(destination.index, 0, movedMenu);
-  
-    const updatedMenusWithOrder = reorderedMenus.map((menu, index) => ({
-      _id: menu._id,
-      order: index,
-    }));
-  
-    dispatch(updateItem({ type: "assetMenus", items: reorderedMenus }));
-  
-    const token = localStorage.getItem("token");
-    if (!token) {
-      console.error("Authorization token is missing.");
-      return;
-    }
-  
-    try {
-      await axios.put(
-        `http://localhost:3001/api/assetMenus/update-order`,
-        { orderedData: updatedMenusWithOrder },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-  
-      const updatedMenus = await axios.get(
-        `http://localhost:3001/api/assetMenus?gameId=${gameId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      dispatch(updateItem({ type: "assetMenus", items: updatedMenus.data }));
-    } catch (error) {
-      console.error("Error saving asset menu order:", error);
-      dispatch(updateItem({ type: "assetMenus", items: previousState }));
+      console.error("Failed to update game description.");
+      alert("Failed to update game description. Please try again.");
     }
   };
 
   const handleCreateAssetMenu = async () => {
-    const token = localStorage.getItem("token");
-    try {
-      setIsLoading(true);
-      const position = { top: Math.random() * 400, left: Math.random() * 400 };
-      const newMenu = {
-        title: "",
-        position,
-        gameId,
-        assets: [],
-        order: assetMenus.length,
-      };
+    const tempId = `temp-${Date.now()}`; // Temporary ID for optimistic update
+    const defaultPosition = { top: 100, left: 100 }; // Default position for new menus
+    const newMenu = {
+      title: "New Menu",
+      position: defaultPosition,
+      _id: tempId,
+      assets: [],
+      gameId,
+    };
 
-      const response = await axios.post(
-        `http://localhost:3001/api/assetMenus`,
-        newMenu,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+    setAssetMenus((prevMenus) => [...prevMenus, newMenu]); // Add temporary menu
 
-      const newAssetMenu = response.data.assetMenu;
-
-      if (newAssetMenu && newAssetMenu._id) {
-        dispatch(createAssetMenu(newAssetMenu));
-      } else {
-        console.error("Asset menu creation failed: No _id received.");
-      }
-    } catch {
-      setError("Failed to create asset menu.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleEditTitleClick = () => setIsEditingTitle(true);
-  const handleTitleChange = (e) => setWindowTitle(e.target.value);
-  const handleTitleSave = () => {
-    setIsEditingTitle(false);
-    debouncedUpdateGameName(windowTitle);
-  };
-
-  const handleEditDescriptionClick = () => setIsEditingDescription(true);
-  const handleDescriptionChange = (e) => setNewDescription(e.target.value);
-  const handleDescriptionSave = () => {
-    setIsEditingDescription(false);
-    debouncedUpdateGameDescription(newDescription);
-  };
-
-  const handleAddGrid = async () => {
     try {
       const token = localStorage.getItem("token");
-      const newGrid = {
-        gameId, // Ensure this is set correctly
-        rows: 5, // Grid row count
-        columns: 5, // Grid column count
-        cellSize: 100, // Cell size
-      };
-  
       const response = await axios.post(
-        `http://localhost:3001/api/grids`,
-        newGrid,
-        { headers: { Authorization: `Bearer ${token}` } }
+        "http://localhost:3001/api/assetMenus",
+        { title: "New Menu", position: defaultPosition, gameId },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
       );
-  
-      const createdGrid = response.data.grid;
-  
-      if (createdGrid) {
-        dispatch(addGrid(createdGrid));
-      } else {
-        setError("Failed to create grid. No grid received.");
-      }
-  
-      // Fetch the updated list of grids to ensure the UI is in sync
-      const gridsResponse = await axios.get(
-        `http://localhost:3001/api/grids?gameId=${gameId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+      const createdMenu = response.data.assetMenu;
+      setAssetMenus((prevMenus) =>
+        prevMenus.map((menu) => (menu._id === tempId ? createdMenu : menu))
       );
-      dispatch(updateItem({ type: "grids", items: gridsResponse.data }));
-  
     } catch (error) {
-      console.error("Error adding grid:", error);
-      setError("Error adding grid.");
+      console.error("Error creating asset menu:", error);
+      setAssetMenus((prevMenus) =>
+        prevMenus.filter((menu) => menu._id !== tempId)
+      ); // Remove temporary menu
     }
   };
 
-  // Debugging: Log assetMenus
-  console.log("assetMenus from Redux:", assetMenus);
+  const handleDrop = async (id, newPosition) => {
+    setAssetMenus((prevMenus) =>
+      prevMenus.map((menu) =>
+        menu._id === id ? { ...menu, position: newPosition } : menu
+      )
+    );
+
+    try {
+      const token = localStorage.getItem("token");
+      await axios.put(
+        `http://localhost:3001/api/assetMenus/${id}`,
+        { position: newPosition },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+    } catch (error) {
+      console.error("Failed to update asset menu position:", error);
+    }
+  };
+
+  const handleAssetDrop = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  
+    const files = e.dataTransfer.files;
+    console.log("Files to upload:", files);
+  
+    const formData = new FormData();
+    Array.from(files).forEach((file) => formData.append("files", file)); // Updated field name to 'files'
+    formData.append("assetMenuId", assetMenuId); // Ensure this matches server-side expectations
+  
+    try {
+      const response = await axios.post(
+        "http://localhost:3001/api/assets/upload",
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+      console.log("Upload response:", response.data);
+    } catch (error) {
+      console.error("Error uploading asset:", error);
+    }
+  };  
+
+  const createNewGrid = async () => {
+    try {
+      const response = await axios.post(
+        "http://localhost:3001/api/grids/create", // Updated URL to match the backend route
+        {
+          gameId,
+          rows: 10, // Example: 10 rows
+          columns: 10, // Example: 10 columns
+          cellSize: 100, // Example: 100px per cell
+        },
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        }
+      );
+      console.log("Created Grid:", response.data.grid);
+      // Add the created grid to the state, or update UI
+    } catch (error) {
+      console.error("Error creating grid:", error);
+    }
+  };
 
   return (
     <div className="game-container">
-      {/* Editable Title */}
-      <header>
-        {isEditingTitle ? (
-          <input
-            type="text"
-            value={windowTitle}
-            onChange={handleTitleChange}
-            onBlur={handleTitleSave}
-            autoFocus
-          />
-        ) : (
-          <h1 onClick={handleEditTitleClick}>{windowTitle}</h1>
-        )}
-        <button
-          onClick={() => setIsEditingTitle((prev) => !prev)}
-          aria-label={isEditingTitle ? "Save Description" : "Edit Description"}
-        >
-          {isEditingTitle ? "Save" : "Edit"}
-        </button>
-      </header>
+      <div>
+        <GameTitleEditor
+          gameName={windowTitle}
+          onChange={debouncedUpdateGameName}
+        />
+        <GameDescriptionEditor
+          gameDescription={gameDescriptionState}
+          onChange={debouncedUpdateGameDescription}
+        />
+      </div>
 
-      {/* Editable Description */}
-      <section className="game-description">
-        {isEditingDescription ? (
-          <input
-            type="text"
-            value={newDescription}
-            onChange={handleDescriptionChange}
-            onBlur={handleDescriptionSave}
-            autoFocus
-          />
-        ) : (
-          <p onClick={handleEditDescriptionClick}>{gameDescriptionState}</p>
-        )}
-        <button
-          onClick={() => setIsEditingDescription((prev) => !prev)}
-          aria-label={isEditingDescription ? "Save Description" : "Edit Description"}
-        >
-          {isEditingDescription ? "Save" : "Edit"}
-        </button>
-      </section>
+      <button onClick={handleCreateAssetMenu}>Create Asset Menu</button>
+      <button onClick={createNewGrid}>Create New Grid</button>
 
-      {/* Drag and Drop Context */}
-      <DragDropContext onDragEnd={handleDragEndAssetMenu}>
-        <Droppable droppableId="assetMenus" direction="vertical">
-          {(provided) => (
-            <div
-              className="asset-menus-list"
-              ref={provided.innerRef}
-              {...provided.droppableProps}
+      <PanContainer>
+        <div className="grid-container">
+          {grid.rows && grid.columns && grid.cellSize && (
+            <SnapGrid
+              id={grid._id || "snap-grid-1"} // ID for the grid
+              rows={grid.rows} // Grid rows
+              columns={grid.columns} // Grid columns
+              cellSize={grid.cellSize} // Cell size in pixels
+              onDrop={handleDrop}
             >
-              {assetMenus && assetMenus.length > 0 ? (
-                assetMenus.map((menu, index) => (
-                  <Draggable key={menu._id} draggableId={menu._id} index={index}>
-                    {(provided) => (
-                      <div
-                        className="asset-menu-item"
-                        ref={provided.innerRef}
-                        {...provided.draggableProps}
-                        {...provided.dragHandleProps}
-                      >
-                        <AssetMenu data={menu} />
-                      </div>
-                    )}
-                  </Draggable>
-                ))
-              ) : (
-                <p>No asset menus available</p>
-              )}
-              {provided.placeholder}
-            </div>
+              {/* Here you can render assets as children */}
+              {assetsState.map((asset) => (
+                <Asset key={asset._id} asset={asset} />
+              ))}
+            </SnapGrid>
           )}
-        </Droppable>
-      </DragDropContext>
-
-      {/* Add Grid Button */}
-      <button onClick={handleAddGrid}>Add Grid</button>
-
-      {/* Error Message */}
-      {error && <p className="error-message">{error}</p>}
+        </div>
+        <div className="asset-menus-container">
+          {assetMenus.map((menu) => (
+            <AssetMenu
+            key={menu._id}
+            _id={menu._id}
+            title={menu.title}
+            position={menu.position}
+            assets={menu.assets}
+            onDrop={(e) => handleAssetDrop(e, menu._id)} // Pass menu ID
+          />          
+          ))}
+        </div>
+      </PanContainer>
     </div>
   );
-}
+};
 
 GameContainer.propTypes = {
-  game: PropTypes.shape({
-    _id: PropTypes.string,
-    gameName: PropTypes.string,
-    gameDescription: PropTypes.string,
-  }),
-  onClose: PropTypes.func,
-  onRename: PropTypes.func,
-  onDescriptionChange: PropTypes.func,
+  game: PropTypes.object,
+  onRename: PropTypes.func.isRequired,
+  onDescriptionChange: PropTypes.func.isRequired,
 };
 
 export default GameContainer;
