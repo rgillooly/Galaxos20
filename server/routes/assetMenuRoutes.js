@@ -18,6 +18,7 @@ router.post("/", async (req, res) => {
 
     // Default to "Untitled" if title is blank
     const newAssetMenu = new AssetMenu({
+      id: `menu-${Date.now()}`, // Ensure the ID is unique
       title: title.trim() || "Untitled", // Default title if empty or whitespace
       position,
       assets,
@@ -53,7 +54,18 @@ router.get("/", async (req, res) => {
       });
     }
 
-    const assetMenus = await AssetMenu.find({ gameId });
+    // Ensure position has valid numbers in MongoDB
+    const assetMenus = await AssetMenu.find();
+    assetMenus.forEach(async (menu) => {
+      if (
+        !menu.position ||
+        typeof menu.position.top !== "number" ||
+        typeof menu.position.left !== "number"
+      ) {
+        menu.position = { top: 100, left: 100 };
+        await menu.save();
+      }
+    });
 
     res.json({
       success: true,
@@ -154,6 +166,53 @@ router.put("/title-update/:id", async (req, res) => {
   } catch (error) {
     console.error("Error updating AssetMenu:", error);
     res.status(500).json({ message: "Error updating AssetMenu", error });
+  }
+});
+
+// PUT /api/assetMenus/positions
+// router.put("/positions", async (req, res) => {
+//   const { positions } = req.body; // positions: array of { _id, position }
+//   try {
+//     await Promise.all(
+//       positions.map(async (pos) => {
+//         await AssetMenu.updateOne(
+//           { _id: pos._id },
+//           { $set: { position: pos.position } }
+//         );
+//       })
+//     );
+//     res.json({ success: true });
+//   } catch (error) {
+//     console.error("Error updating positions:", error);
+//     res.status(500).json({ error: "Failed to update positions" });
+//   }
+// });
+
+router.put("/:id/position", async (req, res) => {
+  const { id } = req.params;
+  const { top, left } = req.body;
+
+  if (top === undefined || left === undefined) {
+    return res
+      .status(400)
+      .json({ error: "Both 'top' and 'left' are required" });
+  }
+
+  try {
+    const updatedMenu = await AssetMenu.findByIdAndUpdate(
+      id,
+      { $set: { position: { top, left } } },
+      { new: true } // Return updated document
+    );
+
+    if (!updatedMenu) {
+      return res.status(404).json({ error: "AssetMenu not found" });
+    }
+
+    res.json({ success: true, assetMenu: updatedMenu });
+  } catch (error) {
+    console.error("Error updating position:", error);
+    res.status(500).json({ error: "Failed to update position" });
   }
 });
 

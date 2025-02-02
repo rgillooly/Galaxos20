@@ -1,15 +1,16 @@
 import React, { useState } from "react";
-import "./PanContainer.css"; // Separate CSS for styles (optional)
+import "./PanContainer.css";
 
-function PanContainer({ children }) {
+function PanContainer({ children, setIsDraggingAsset, windowPosition }) {
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [startPoint, setStartPoint] = useState({ x: 0, y: 0 });
-  const [isDraggingAsset, setIsDraggingAsset] = useState(false); // Track if an asset is being dragged
+
+  // Fallback if windowPosition is not passed or is undefined
+  const position = windowPosition || { x: 0, y: 0 };
 
   const handleMouseDown = (e) => {
-    // Prevent panning if an asset is being dragged
-    if (e.button === 2 && !isDraggingAsset) {
+    if (e.button === 2 && !isPanning) {
       setIsPanning(true);
       setStartPoint({ x: e.clientX, y: e.clientY });
     }
@@ -27,36 +28,30 @@ function PanContainer({ children }) {
     setIsPanning(false);
   };
 
-  // Handle dragging state from child components (AssetMenu)
-  const handleAssetDragStart = () => {
-    setIsDraggingAsset(true); // Set dragging flag to true when asset starts being dragged
-  };
-
-  const handleAssetDragEnd = () => {
-    setIsDraggingAsset(false); // Reset dragging flag when asset drag ends
-  };
-
   return (
     <div
       className="pan-container"
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onContextMenu={(e) => e.preventDefault()} // Disable context menu
+      onContextMenu={(e) => e.preventDefault()}
     >
       <div
         className="pan-content"
         style={{
-          transform: `translate(${offset.x}px, ${offset.y}px)`,
+          transform: `translate(${offset.x + position.x}px, ${
+            offset.y + position.y
+          }px)`,
         }}
       >
-        {/* Pass down drag handlers to children */}
-        {React.Children.map(children, (child) =>
-          React.cloneElement(child, {
-            onAssetDragStart: handleAssetDragStart, // Pass drag start handler
-            onAssetDragEnd: handleAssetDragEnd, // Pass drag end handler
-          })
-        )}
+        {/* Filter out props that are passed to DOM elements */}
+        {React.Children.map(children, (child) => {
+          // Ensure setIsDraggingAsset is only passed to non-DOM elements (React components)
+          if (child.type && typeof child.type !== "string") {
+            return React.cloneElement(child, { setIsDraggingAsset });
+          }
+          return child;
+        })}
       </div>
     </div>
   );

@@ -1,72 +1,40 @@
 import React, { useState } from "react";
-import PropTypes from "prop-types";
-import "./Asset.css";
+import { useDrag } from "react-dnd";
 
-function Asset({ asset }) {
-  const [dragging, setDragging] = useState(false);
-  const [position, setPosition] = useState({ x: asset.x, y: asset.y });
-  const [size, setSize] = useState({
-    width: asset.width,
-    height: asset.height,
-  });
+const Asset = ({ asset, onMove }) => {
+  const [position, setPosition] = useState({ top: asset.y, left: asset.x });
 
-  const handleDragStart = (e) => {
-    setDragging(true);
-    e.dataTransfer.setData("asset", JSON.stringify(asset)); // Save the asset data
-  };
+  const [{ isDragging }, drag] = useDrag(() => ({
+    type: "ASSET",
+    item: { ...asset, x: position.left, y: position.top },
+    collect: (monitor) => ({
+      isDragging: monitor.isDragging(),
+    }),
+  }));
 
-  const handleDragEnd = () => {
-    setDragging(false);
-  };
-
-  const handleResize = (e) => {
-    const newWidth = Math.max(50, e.clientX - position.x); // Keep a minimum size
-    const newHeight = Math.max(50, e.clientY - position.y); // Keep a minimum size
-
-    setSize({ width: newWidth, height: newHeight });
+  const handleDrop = (newPosition) => {
+    setPosition(newPosition);
+    if (onMove) {
+      onMove({ ...asset, x: newPosition.left, y: newPosition.top });
+    }
   };
 
   return (
     <div
+      ref={drag}
       className="asset"
-      draggable={!dragging}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
       style={{
         position: "absolute",
-        top: `${position.y}px`,
-        left: `${position.x}px`,
-        width: `${size.width}px`,
-        height: `${size.height}px`,
-        border: "1px solid #000",
-        backgroundColor: "lightgray",
-        cursor: dragging ? "grabbing" : "grab",
+        left: position.left,
+        top: position.top,
+        opacity: isDragging ? 0.5 : 1,
+        cursor: "move",
       }}
+      onDrop={(e) => handleDrop(e)}
     >
-      <div
-        className="resize-handle"
-        onMouseDown={handleResize}
-        style={{
-          position: "absolute",
-          bottom: 0,
-          right: 0,
-          width: "10px",
-          height: "10px",
-          backgroundColor: "darkgray",
-          cursor: "se-resize",
-        }}
-      />
+      {asset.name}
     </div>
   );
-}
-
-Asset.propTypes = {
-  asset: PropTypes.shape({
-    x: PropTypes.number,
-    y: PropTypes.number,
-    width: PropTypes.number,
-    height: PropTypes.number,
-  }).isRequired,
 };
 
 export default Asset;

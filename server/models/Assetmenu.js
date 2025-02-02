@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const Game = require("./Game");
 
 const PositionSchema = new mongoose.Schema({
   top: {
@@ -13,6 +14,9 @@ const PositionSchema = new mongoose.Schema({
 
 const AssetMenuSchema = new mongoose.Schema(
   {
+    id: {
+      type: String, // Change this from ObjectId to String
+    },
     gameId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Game",
@@ -33,4 +37,6 @@ const AssetMenuSchema = new mongoose.Schema(
   { timestamps: true } // Optionally, add timestamps for createdAt and updatedAt
 );
 
-module.exports = mongoose.model("AssetMenu", AssetMenuSchema);
+const AssetMenu = mongoose.model("AssetMenu", AssetMenuSchema);
+
+module.exports = AssetMenu;

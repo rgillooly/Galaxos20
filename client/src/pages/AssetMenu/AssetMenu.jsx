@@ -1,313 +1,248 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import PropTypes from "prop-types";
-import axios from "axios";
-import "./AssetMenu.css";
+import Draggable from "react-draggable";
+import "react-grid-layout/css/styles.css";
+import "react-resizable/css/styles.css";
 
-function AssetMenu({
-  _id,
-  title,
-  position,
-  assets, // These are the asset IDs
-  onDrop,
-  onTitleUpdate,
-  onAssetsUpdate,
-  onClose,
-}) {
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
-  const [menuPosition, setMenuPosition] = useState(position);
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [currentTitle, setCurrentTitle] = useState(title);
-  const [assetsState, setAssetsState] = useState([]); // Start with an empty array
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [isMinimized, setIsMinimized] = useState(false); // Track whether the menu is minimized
-  const [isLocked, setIsLocked] = useState(false); // Lock state to prevent dragging
+const AssetMenu = ({
+  menu,
+  fetchAssets,
+  updatePosition,
+  name,
+  setIsDraggingAsset,
+}) => {
+  const [assets, setAssets] = useState([]);
+  const [position, setPosition] = useState({ top: 100, left: 100 });
+  const [draggingAsset, setDraggingAsset] = useState(null);
+  const [hasLoadedPosition, setHasLoadedPosition] = useState(false);
+  const [droppedAssets, setDroppedAssets] = useState([]);
+  const dragOffset = useRef({ x: 0, y: 0 });
+  const prevPosition = useRef(position);
 
-  // Function to retrieve the authentication token from localStorage
-  const getAuthToken = () => localStorage.getItem("token");
-
+  // Load asset menu position only once on mount
   useEffect(() => {
-    const fetchAssets = async () => {
+    if (hasLoadedPosition) return;
+
+    const loadAssetMenu = async () => {
       try {
-        const token = getAuthToken();
-        const response = await axios.get(
-          `http://localhost:3001/api/assets/${_id}`, // Use `_id` as assetMenuId
-          { headers: { Authorization: `Bearer ${token}` } }
+        const token = localStorage.getItem("token");
+        if (!token) {
+          console.error("No token found. User is not authenticated.");
+          return;
+        }
+
+        const response = await fetch(
+          `http://localhost:3001/api/assetMenus/${menu._id}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
         );
 
-        if (response.data.success) {
-          console.log("Assets fetched:", response.data.assets);
-          setAssetsState(response.data.assets); // Update state with fetched assets
-        } else {
-          console.error("Failed to fetch assets:", response.data.message);
-          setError("Failed to load assets. Please try again.");
+        if (response.status === 401) {
+          console.error("Unauthorized: Token is invalid or expired.");
+          return;
+        }
+
+        const data = await response.json();
+
+        if (data.assetMenu?.position) {
+          const newPosition = {
+            top: Number(data.assetMenu.position.top) || 100,
+            left: Number(data.assetMenu.position.left) || 100,
+          };
+
+          setPosition(newPosition);
+          prevPosition.current = newPosition;
+          setHasLoadedPosition(true);
         }
       } catch (error) {
-        console.error("Error fetching assets:", error);
-        setError("Error fetching assets. Please check your connection.");
-      } finally {
-        setLoading(false);
+        console.error("Error loading asset menu:", error);
       }
     };
 
-    fetchAssets();
-  }, [_id]); // Fetch assets whenever the `_id` (menu ID) changes
+    loadAssetMenu();
+  }, [menu._id, hasLoadedPosition]);
 
-  const handleMouseDown = (e) => {
-    if (isLocked) return; // Prevent dragging if locked
-
-    e.preventDefault();
-    setIsDragging(true);
-    setDragStartPos({ x: e.clientX, y: e.clientY });
-  };
-
-  const handleMouseMove = (e) => {
-    if (!isDragging || isLocked) return; // Prevent moving if locked
-
-    const deltaX = e.clientX - dragStartPos.x;
-    const deltaY = e.clientY - dragStartPos.y;
-
-    setMenuPosition((prevPos) => ({
-      top: prevPos.top + deltaY,
-      left: prevPos.left + deltaX,
-    }));
-
-    setDragStartPos({ x: e.clientX, y: e.clientY });
-  };
-
-  const handleMouseUp = () => {
-    if (isDragging) {
-      setIsDragging(false);
-      if (onDrop) {
-        onDrop(_id, menuPosition); // Call onDrop when drag is complete
-      }
-    }
-  };
-
-  useEffect(() => {
-    document.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseup", handleMouseUp);
-
-    return () => {
-      document.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [isDragging, dragStartPos]);
-
-  const handleTitleChange = (e) => {
-    setCurrentTitle(e.target.value);
-  };
-
-  const handleEditTitle = () => {
-    setIsEditingTitle(true);
-  };
-
-  const handleSaveTitle = async () => {
-    if (!currentTitle.trim()) {
-      alert("Title cannot be empty.");
-      setCurrentTitle(title);
-      setIsEditingTitle(false);
-      return;
-    }
-
-    setIsEditingTitle(false);
-
+  // Update position after drag stops
+  const updateMenuPosition = async (menuId, newPosition) => {
     try {
-      const token = getAuthToken();
-      await axios.put(
-        `http://localhost:3001/api/assetMenus/title-update/${_id}`,
-        { title: currentTitle },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      if (onTitleUpdate) {
-        onTitleUpdate(_id, currentTitle); // Notify parent about title change
-      }
+      const token = localStorage.getItem("token");
+      await fetch(`http://localhost:3001/api/assetMenus/${menuId}/position`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(newPosition),
+      });
     } catch (error) {
-      console.error("Error updating title:", error);
-      setCurrentTitle(title); // Revert title on error
+      console.error("Error updating menu position:", error);
     }
   };
 
-  const handleDragStart = (e, asset) => {
-    e.dataTransfer.setData("asset", JSON.stringify(asset)); // Store asset data to be dropped
-  };
+  // Handle drag start
+  const handleStart = useCallback(
+    (e, data) => {
+      setIsDraggingAsset(true);
+      setDraggingAsset(e.target);
+    },
+    [setIsDraggingAsset]
+  );
 
-  const handleAssetDrop = (e) => {
+  // Handle drag stop
+  const handleStop = useCallback(
+    (e, data) => {
+      const newPosition = {
+        top: prevPosition.current.top + data.y,
+        left: prevPosition.current.left + data.x,
+      };
+
+      setPosition(newPosition);
+      prevPosition.current = newPosition;
+
+      updateMenuPosition(menu._id, newPosition);
+
+      setIsDraggingAsset(false);
+      setDraggingAsset(null);
+    },
+    [menu._id, setIsDraggingAsset]
+  );
+
+  // Handle drag movement
+  const handleDrag = useCallback((e, data) => {
+    dragOffset.current = { x: data.deltaX, y: data.deltaY };
+  }, []);
+
+  // Handle dragover (to allow dropping)
+  const handleDragOver = useCallback((e) => {
     e.preventDefault();
-    const asset = JSON.parse(e.dataTransfer.getData("asset"));
-    // Assuming you pass on the asset to the parent component (e.g., GameContainer)
-    if (onDrop) {
-      onDrop(asset); // Asset should be dropped to the grid
-    }
-  };
+  }, []);
 
-  const handleDrop = async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
+  // Handle drop
+  const handleDrop = useCallback(
+    (e) => {
+      e.preventDefault();
 
-    const files = e.dataTransfer.files;
-    if (!files || files.length === 0) return;
+      const rect = e.target.getBoundingClientRect();
+      const dropX = e.clientX - rect.left;
+      const dropY = e.clientY - rect.top;
 
-    setUploading(true);
-    setUploadError(null);
-
-    const formData = new FormData();
-    Array.from(files).forEach((file) => {
-      formData.append("files[]", file); // Append each file
-    });
-    formData.append("assetMenuId", _id);
-
-    try {
-      const response = await axios.post(
-        "http://localhost:3001/api/assets/upload",
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${getAuthToken()}`,
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      if (response.data.success) {
-        const uploadedAssets = response.data.assets; // Assuming the backend returns multiple assets
-        setAssetsState((prevAssets) => [...prevAssets, ...uploadedAssets]);
-
-        if (onAssetsUpdate) {
-          onAssetsUpdate(uploadedAssets);
-        }
-      } else {
-        setUploadError("Upload failed. Please try again.");
+      if (draggingAsset) {
+        setDroppedAssets((prev) => [
+          ...prev,
+          { asset: draggingAsset, position: { x: dropX, y: dropY } },
+        ]);
       }
-    } catch (error) {
-      console.error("Error uploading asset:", error);
-      setUploadError("Error uploading asset. Please check your connection.");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  // Toggle minimized state
-  const toggleMinimize = () => {
-    setIsMinimized((prev) => !prev);
-  };
-
-  // Toggle lock state
-  const toggleLock = () => {
-    setIsLocked((prev) => !prev);
-  };
+    },
+    [draggingAsset]
+  );
 
   return (
-    <div
-      className="asset-menu"
-      style={{
-        position: "absolute",
-        top: `${menuPosition.top}px`,
-        left: `${menuPosition.left}px`,
-        width: 200, // Fixed width
-        height: 150, // Fixed height
-        cursor: isLocked ? "default" : "move", // Cursor change when locked
-        border: "1px solid #ccc",
-        backgroundColor: "white",
-        padding: "10px",
-        boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
-      }}
-      onMouseDown={handleMouseDown}
-      onDragOver={(e) => e.preventDefault()}
-      onDrop={handleDrop}
+    <Draggable
+      handle=".drag-handle"
+      onStop={handleStop}
+      onStart={handleStart}
+      onDrag={handleDrag}
+      position={{ x: dragOffset.current.x, y: dragOffset.current.y }}
     >
-      <header className="asset-menu-header">
-        {isEditingTitle ? (
-          <input
-            type="text"
-            value={currentTitle}
-            onChange={handleTitleChange}
-            onBlur={handleSaveTitle}
-            autoFocus
-            className="edit-input"
-          />
-        ) : (
-          <h3 onClick={toggleMinimize} style={{ cursor: "pointer" }}>
-            {currentTitle}
-          </h3>
-        )}
-        <div className="header-actions">
-          {/* Rename Button */}
-          {!isEditingTitle && (
-            <button onClick={handleEditTitle} className="rename-button">
-              Rename
-            </button>
-          )}
-          {/* Lock Button */}
-          <button onClick={toggleLock} className="lock-button">
-            {isLocked ? "Unlock" : "Lock"}
-          </button>
-          {/* Close Button */}
-          <button onClick={() => onClose && onClose(_id)}>Close</button>
+      <div
+        style={{
+          position: "relative",
+          top: `${position.top + dragOffset.current.y}px`,
+          left: `${position.left + dragOffset.current.x}px`,
+          width: "300px",
+          height: "500px",
+          backgroundColor: "#f0f0f0",
+        }}
+      >
+        <div
+          className="drag-handle"
+          style={{
+            backgroundColor: "#ddd",
+            padding: "8px",
+            cursor: "grab",
+            textAlign: "center",
+            borderRadius: "6px 6px 0 0",
+          }}
+        >
+          <h3>{name}</h3>
         </div>
-      </header>
+        <div
+          className="asset-list"
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+          style={{
+            position: "relative",
+            height: "100%",
+            padding: "10px",
+            overflowY: "auto",
+            border: "2px dashed #ccc",
+          }}
+        >
+          {assets.length > 0 ? (
+            assets.map((asset) => {
+              const { id, imageUrl, name } = asset;
+              const assetImageUrl = imageUrl || "default_image_url.png";
+              return (
+                <div key={id} className="asset-item" draggable>
+                  <img src={assetImageUrl} alt={name} />
+                  <p>{name}</p>
+                </div>
+              );
+            })
+          ) : (
+            <p>No assets available</p>
+          )}
 
-      {/* Display content only if not minimized */}
-      {!isMinimized && (
-        <>
-          {uploading && <p>Uploading...</p>}
-          {uploadError && <p className="error-message">{uploadError}</p>}
-          <div
-            className="drop-zone"
-            onDrop={handleDrop}
-            onDragOver={(e) => e.preventDefault()}
-            onDragEnter={(e) => e.preventDefault()}
-          >
-            <p>Drag and drop a file here to add it to the menu.</p>
-          </div>
-          <div className="asset-menu-content">
-            {loading ? (
-              <p>Loading assets...</p>
-            ) : error ? (
-              <p className="error-message">{error}</p>
-            ) : assetsState.length > 0 ? (
-              <ul>
-                {assetsState.map((asset) => (
-                  <li key={asset._id}>
-                    {asset.type && asset.type.startsWith("image") ? (
-                      <img
-                        src={`http://localhost:3001/${asset.filePath}`}
-                        alt={asset.name}
-                        className="asset-thumbnail"
-                      />
-                    ) : (
-                      <div className="file-icon">{asset.type}</div>
-                    )}
-                    <div>{asset.name}</div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p>No assets available</p>
-            )}
-          </div>
-        </>
-      )}
-    </div>
+          {/* Render dropped assets */}
+          {droppedAssets.length > 0 &&
+            droppedAssets.map((item, index) => {
+              const { asset, position } = item;
+              const { imageUrl, name } = asset;
+              const droppedAssetImageUrl = imageUrl || "default_image_url.png";
+
+              return (
+                <div
+                  key={index}
+                  style={{
+                    position: "absolute",
+                    top: `${position.y}px`,
+                    left: `${position.x}px`,
+                    width: "50px",
+                    height: "50px",
+                    backgroundColor: "#fff",
+                    border: "1px solid #ddd",
+                    padding: "5px",
+                    boxSizing: "border-box",
+                  }}
+                >
+                  <img
+                    src={droppedAssetImageUrl}
+                    alt={name}
+                    style={{ width: "100%", height: "100%" }}
+                  />
+                </div>
+              );
+            })}
+        </div>
+      </div>
+    </Draggable>
   );
-}
+};
 
 AssetMenu.propTypes = {
-  _id: PropTypes.string.isRequired,
-  title: PropTypes.string.isRequired,
-  position: PropTypes.shape({
-    top: PropTypes.number.isRequired,
-    left: PropTypes.number.isRequired,
-  }).isRequired,
-  assets: PropTypes.array.isRequired, // These are the asset IDs
-  onDrop: PropTypes.func.isRequired,
-  onTitleUpdate: PropTypes.func,
-  onAssetsUpdate: PropTypes.func,
-  onClose: PropTypes.func,
+  menu: PropTypes.shape({
+    _id: PropTypes.string.isRequired,
+    title: PropTypes.string.isRequired,
+    position: PropTypes.object.isRequired,
+  }),
+  fetchAssets: PropTypes.func.isRequired,
+  updatePosition: PropTypes.func.isRequired,
+  setIsDraggingAsset: PropTypes.func.isRequired,
 };
 
 export default AssetMenu;

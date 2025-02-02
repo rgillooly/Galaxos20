@@ -6,7 +6,6 @@ const MovableWindow = ({ children, title, onClose }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: 100, y: 100 });
   const windowRef = useRef(null);
-  const contentRef = useRef(null); // Ref to observe content size changes
   const dragStart = useRef({ x: 0, y: 0 });
 
   // Mouse down event for initiating dragging
@@ -73,14 +72,20 @@ const MovableWindow = ({ children, title, onClose }) => {
       <header className="movable-window-header" onMouseDown={handleMouseDown}>
         {title && <span>{title}</span>}
         {onClose && (
-          <button onClick={onClose} style={{ background: "none", border: "none" }}>
+          <button
+            onClick={onClose}
+            style={{ background: "none", border: "none" }}
+          >
             X
           </button>
         )}
       </header>
 
-      <div className="movable-window-content" ref={contentRef}>
-        {children}
+      <div className="movable-window-content">
+        {/* Pass position as a prop to the children */}
+        {React.Children.map(children, (child) =>
+          React.cloneElement(child, { windowPosition: position })
+        )}
       </div>
     </div>
   );

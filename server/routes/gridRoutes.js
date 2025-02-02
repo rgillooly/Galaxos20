@@ -1,35 +1,20 @@
 const express = require("express");
-const Grid = require("../models/Grid");
 const authenticateJWT = require("../middlewares/AuthenticateJWT");
 const router = express.Router();
+const mongoose = require("mongoose");
+const Grid = require("../models/Grid");
 
 // Create a new grid
 router.post("/create", authenticateJWT, async (req, res) => {
   const { gameId, rows, columns, cellSize } = req.body;
 
   try {
-    // Validate input
-    if (!gameId) {
-      return res.status(400).json({ message: "Game ID is required." });
-    }
-    if (!Number.isInteger(rows) || rows <= 0) {
-      return res
-        .status(400)
-        .json({ message: "Rows must be a positive integer." });
-    }
-    if (!Number.isInteger(columns) || columns <= 0) {
-      return res
-        .status(400)
-        .json({ message: "Columns must be a positive integer." });
-    }
-    if (!Number.isInteger(cellSize) || cellSize <= 0) {
-      return res
-        .status(400)
-        .json({ message: "Cell size must be a positive integer." });
+    if (!gameId || !mongoose.Types.ObjectId.isValid(gameId)) {
+      return res.status(400).json({ message: "Invalid Game ID." });
     }
 
     const newGrid = new Grid({
-      gameId,
+      gameId: new mongoose.Types.ObjectId(gameId),
       rows,
       columns,
       cellSize,
@@ -45,25 +30,104 @@ router.post("/create", authenticateJWT, async (req, res) => {
   }
 });
 
-// Get all grids for a specific game
-router.get("/", authenticateJWT, async (req, res) => {
+// Fetch grids by gameId
+router.get("/", async (req, res) => {
   const { gameId } = req.query;
 
-  if (!gameId) {
+  try {
+    if (!gameId || !mongoose.Types.ObjectId.isValid(gameId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid gameId is required",
+      });
+    }
+
+    const snapGrids = await Grid.find({ gameId });
+
+    for (const grid of snapGrids) {
+      if (
+        !grid.position ||
+        typeof grid.position.top !== "number" ||
+        typeof grid.position.left !== "number"
+      ) {
+        grid.position = { top: 100, left: 100 };
+        await grid.save();
+      }
+    }
+
+    res.json({ success: true, snapGrids });
+  } catch (error) {
+    console.error("Error fetching grids:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Error fetching grids", error });
+  }
+});
+
+// Fetch an grid by ID (for update or to display details)
+router.get("/:id", async (req, res) => {
+  try {
+    const grid = await Grid.findById(req.params.id);
+    if (!grid) {
+      return res.status(404).json({ message: "Grid not found" });
+    }
+
+    res.json({ grid });
+  } catch (err) {
+    console.error("Error fetching grid:", err);
+    res
+      .status(500)
+      .json({ message: "Error fetching grid", error: err.message });
+  }
+});
+
+// Fetch assets for a specific grid
+router.get("/:id/assets", authenticateJWT, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid Grid ID format." });
+    }
+
+    const grid = await Grid.findById(id).populate("assets");
+
+    if (!grid) {
+      return res.status(404).json({ message: "Grid not found." });
+    }
+
+    res.json(grid.assets);
+  } catch (error) {
+    console.error("Error fetching assets:", error);
+    res.status(500).json({ message: "Failed to fetch assets" });
+  }
+});
+
+router.put("/:id/position", async (req, res) => {
+  const { id } = req.params;
+  const { top, left } = req.body.position; // Accessing position.top and position.left
+
+  if (top === undefined || left === undefined) {
     return res
       .status(400)
-      .json({ message: "Game ID is required to fetch grids." });
+      .json({ error: "Both 'top' and 'left' are required" });
   }
 
   try {
-    const grids = await Grid.find({ gameId });
-    if (grids.length === 0) {
-      return res.status(404).json({ message: "No grids found for this game." });
+    const updatedGrid = await Grid.findByIdAndUpdate(
+      id,
+      { $set: { position: { top, left } } },
+      { new: true }
+    );
+
+    if (!updatedGrid) {
+      return res.status(404).json({ error: "Grid not found" });
     }
-    res.json({ grids, gridsFetched: true });
-  } catch (err) {
-    console.error("Failed to fetch grids:", err);
-    res.status(500).json({ message: "Failed to fetch grids" });
+
+    res.json({ success: true, snapGrid: updatedGrid });
+  } catch (error) {
+    console.error("Error updating position:", error);
+    res.status(500).json({ error: "Failed to update position" });
   }
 });
 

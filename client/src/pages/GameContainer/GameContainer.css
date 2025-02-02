@@ -86,29 +86,3 @@ body {
     height: 85vh;
   }
 }
-
-/* Grid container for the asset menus */
-.asset-menu-grid {
-  display: grid;
-  grid-template-columns: repeat(
-    auto-fill,
-    minmax(200px, 1fr)
-  ); /* Responsive grid layout */
-  gap: 16px; /* Space between grid items */
-  padding: 16px;
-  overflow-y: auto; /* Allow scrolling if there are many items */
-  position: relative;
-  /* No need for top/left positioning here */
-}
-
-/* Each asset menu item (for drag-and-drop) */
-.asset-menu-grid-item {
-  display: flex;
-  flex-direction: column;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background-color: white;
-  padding: 16px;
-  box-sizing: border-box; /* Ensure padding is inside the width/height */
-  position: relative; /* This will help for dragging */
-}
